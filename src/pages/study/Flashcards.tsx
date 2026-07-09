@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { generateFlashcardsFromText } from '../../services/gemini';
+import { generateFlashcardsFromText, extractTopicsFromText } from '../../services/gemini';
 import { supabase } from '../../services/supabase';
 import {
   Layers,
@@ -54,6 +54,8 @@ export const Flashcards: React.FC = () => {
   const { isMock } = useAuth();
   const [documents, setDocuments] = useState<any[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
+  const [topics, setTopics] = useState<string[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -94,6 +96,45 @@ export const Flashcards: React.FC = () => {
       fetchSupabaseDocs();
     }
   }, [isMock]);
+
+  // Dynamically load topics when document is selected
+  useEffect(() => {
+    if (!selectedDocId) return;
+
+    const loadTopics = async () => {
+      try {
+        let fullText = '';
+        if (isMock) {
+          const stored = localStorage.getItem('studyys_files');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            const doc = parsed.find((d: any) => d.id === selectedDocId);
+            if (doc && doc.extracted_text) {
+              fullText = doc.extracted_text.map((p: any) => p.text).join('\n\n');
+            }
+          }
+        } else {
+          const { data: chunks } = await supabase
+            .from('document_chunks')
+            .select('chunk_text')
+            .eq('document_id', selectedDocId);
+          if (chunks) {
+            fullText = chunks.map((c: any) => c.chunk_text).join('\n\n');
+          }
+        }
+
+        const extracted = extractTopicsFromText(fullText);
+        setTopics(extracted);
+        if (extracted.length > 0) {
+          setSelectedTopic(extracted[0]);
+        }
+      } catch (err) {
+        console.error('Error loading topics:', err);
+      }
+    };
+
+    loadTopics();
+  }, [selectedDocId, documents, isMock]);
 
   useEffect(() => {
     // Load flashcards from localstorage or use defaults
@@ -147,7 +188,7 @@ export const Flashcards: React.FC = () => {
     localStorage.setItem('studyys_flashcards', JSON.stringify(updated));
   };
 
-  const generateNewDeck = async () => {
+  const generateNewDeck = async (append = false) => {
     setErrorMsg(null);
     setLoading(true);
     try {
@@ -178,7 +219,7 @@ export const Flashcards: React.FC = () => {
         contextText = selectedDoc ? `Generate flashcards for ${selectedDoc.title} in subject ${selectedDoc.subject}` : 'General Computer Science, Math, and Physics';
       }
 
-      const generated = await generateFlashcardsFromText(contextText);
+      const generated = await generateFlashcardsFromText(contextText, selectedTopic, 50);
       const mappedCards: Flashcard[] = generated.map((gc, index) => ({
         id: `fc-gen-${Date.now()}-${index}`,
         topic: gc.topic,
@@ -188,10 +229,19 @@ export const Flashcards: React.FC = () => {
         revisionCount: 0
       }));
 
-      setCards(mappedCards);
-      localStorage.setItem('studyys_flashcards', JSON.stringify(mappedCards));
-      setCurrentIdx(0);
-      setIsFlipped(false);
+      if (append) {
+        const updated = [...cards, ...mappedCards];
+        setCards(updated);
+        localStorage.setItem('studyys_flashcards', JSON.stringify(updated));
+        // Move to the first new card in the appended deck
+        setCurrentIdx(cards.length);
+        setIsFlipped(false);
+      } else {
+        setCards(mappedCards);
+        localStorage.setItem('studyys_flashcards', JSON.stringify(mappedCards));
+        setCurrentIdx(0);
+        setIsFlipped(false);
+      }
     } catch (err: any) {
       console.error(err);
       setErrorMsg('Failed to generate flashcards from the selected document.');
@@ -214,6 +264,7 @@ export const Flashcards: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Document Dropdown */}
           <div className="w-full sm:w-60">
             <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
               Select Source Document
@@ -237,8 +288,27 @@ export const Flashcards: React.FC = () => {
             )}
           </div>
 
+          {/* Topic Dropdown */}
+          <div className="w-full sm:w-60">
+            <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+              Select Study Topic
+            </label>
+            <select
+              value={selectedTopic}
+              onChange={(e) => setSelectedTopic(e.target.value)}
+              disabled={topics.length === 0}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 disabled:opacity-50"
+            >
+              {topics.map((top, idx) => (
+                <option key={idx} value={top}>
+                  {top}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
-            onClick={generateNewDeck}
+            onClick={() => generateNewDeck(false)}
             disabled={loading || documents.length === 0}
             className="bg-gradient-brand text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-[0.98] disabled:opacity-50 mt-4 sm:mt-5"
           >
@@ -267,7 +337,7 @@ export const Flashcards: React.FC = () => {
           <Layers className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
           <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No Flashcards Yet</p>
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-xs mx-auto">
-            Select a document from the header dropdown and click "Generate Cards" to build a deck.
+            Select a document & topic from the header and click "Generate Cards" to build a deck.
           </p>
         </div>
       ) : (
@@ -370,6 +440,16 @@ export const Flashcards: React.FC = () => {
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Generate 50 more cards button */}
+          <button
+            onClick={() => generateNewDeck(true)}
+            disabled={loading}
+            className="w-full bg-gradient-brand text-white font-bold py-3 rounded-xl text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            Generate 50 More Cards for "{selectedTopic}"
+          </button>
         </div>
       )}
     </div>

@@ -143,7 +143,7 @@ export const Quiz: React.FC = () => {
         contextText = selectedDoc ? `Generate quiz about ${selectedDoc.title} in subject ${selectedDoc.subject}` : 'General Engineering, JEE and CBSE';
       }
 
-      const generated = await generateQuizFromText(contextText, difficulty);
+      const generated = await generateQuizFromText(contextText, difficulty, 50);
       setQuestions(generated);
       setSelectedAnswers({});
       setCurrentIdx(0);
@@ -377,12 +377,18 @@ export const Quiz: React.FC = () => {
               Your results have been synced to your dashboard and study history metrics.
             </p>
 
-            <div className="flex gap-3 justify-center pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <button
                 onClick={resetQuiz}
-                className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-705 text-slate-700 dark:text-slate-300 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition"
+                className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-705 text-slate-700 dark:text-slate-300 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
               >
                 <RotateCcw className="w-4 h-4" /> Retry Quiz
+              </button>
+              <button
+                onClick={startQuiz}
+                className="bg-gradient-brand text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm active:scale-95"
+              >
+                <Brain className="w-4 h-4" /> Generate 50 More Questions
               </button>
             </div>
           </div>
