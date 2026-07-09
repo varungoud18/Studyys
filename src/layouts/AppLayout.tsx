@@ -197,6 +197,18 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
             <LogOut className="w-4 h-4 flex-shrink-0" />
             <span>Sign Out</span>
           </button>
+          
+          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 text-[10px] text-center text-slate-400 dark:text-slate-500 font-semibold">
+            Developed & Maintained by <br />
+            <a 
+              href="https://github.com/varungoud18" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-brand-500 hover:underline font-bold"
+            >
+              Karupothula Varun Goud
+            </a>
+          </div>
         </div>
       </aside>
 

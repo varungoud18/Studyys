@@ -173,3 +173,11 @@ To enable seamless Google sign-in:
     *   Navigate to the Supabase Console > **Authentication** > **Providers** > **Google**.
     *   Enable the provider and input your Client ID and Client Secret.
 3.  **Use:** Reload the app, and you can now log in using the **Sign in with Google** button!
+
+---
+
+## 👤 Author & Developer
+*   **Name:** Karupothula Varun Goud
+*   **GitHub Profile:** [@varungoud18](https://github.com/varungoud18)
+*   **Repository:** [Studyys Codebase](https://github.com/varungoud18/Studyys)
+
