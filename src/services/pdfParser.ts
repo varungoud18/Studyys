@@ -1,33 +1,46 @@
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure the PDFJS worker URL from CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.js';
-
 export interface ExtractedPage {
   pageNumber: number;
   text: string;
 }
 
+/**
+ * Extracts text from a PDF file using PDF.js loaded dynamically.
+ * Using dynamic import avoids TypeScript resolution issues with ?url / ?worker Vite suffixes.
+ * The worker file was pre-copied to /public/pdf.worker.min.mjs via `node copy_worker.js`.
+ */
 export const extractTextFromPdf = async (file: File): Promise<ExtractedPage[]> => {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-    const pdf = await loadingTask.promise;
-    const numPages = pdf.numPages;
-    const extractedPages: ExtractedPage[] = [];
+  // Dynamic import - Vite bundles this correctly at runtime, avoiding
+  // any top-level static import TypeScript / module cache issues.
+  const pdfjsLib = await import('pdfjs-dist');
 
-    for (let i = 1; i <= numPages; i++) {
+  // Point to the worker we already copied into the public folder.
+  // window.location.origin ensures same-origin (no CORS), and Vite serves /public/* directly.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `${window.location.origin}/pdf.worker.min.mjs`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(arrayBuffer),
+    useSystemFonts: true,
+    disableAutoFetch: true,
+    disableStream: true,
+  });
+
+  const pdf = await loadingTask.promise;
+  const numPages = pdf.numPages;
+  const extractedPages: ExtractedPage[] = [];
+
+  for (let i = 1; i <= numPages; i++) {
+    try {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str || '')
+      const pageText = (textContent.items as any[])
+        .map((item) => item.str || '')
         .join(' ');
       extractedPages.push({ pageNumber: i, text: pageText.trim() });
+    } catch {
+      extractedPages.push({ pageNumber: i, text: '' });
     }
-
-    return extractedPages;
-  } catch (error) {
-    console.error('Error parsing PDF text:', error);
-    throw new Error('Could not parse PDF content. Please make sure the file is not corrupted.');
   }
+
+  return extractedPages;
 };

@@ -137,8 +137,15 @@ export const Upload: React.FC = () => {
     setLoading(true);
 
     try {
-      // Extract text content from PDF first on client-side
-      const extractedPages = await extractTextFromPdf(file);
+      // --- Step 1: Try to extract text (non-blocking — upload proceeds even if this fails) ---
+      let extractedPages: { pageNumber: number; text: string }[] = [];
+      try {
+        extractedPages = await extractTextFromPdf(file);
+      } catch (parseErr: any) {
+        console.warn('[Upload] PDF text extraction failed, proceeding without text:', parseErr?.message);
+        // Fallback: treat as a 1-page document with no text
+        extractedPages = [{ pageNumber: 1, text: '' }];
+      }
 
       if (isMock) {
         // Create Mock Document
@@ -159,17 +166,16 @@ export const Upload: React.FC = () => {
         localStorage.setItem('studyys_files', JSON.stringify(updated));
         setLoading(false);
       } else {
-        // Supabase storage upload
+        // --- Step 2: Upload file to Supabase storage ---
         const filePath = `${profile?.id}/${Date.now()}_${file.name}`;
-        
-        // 1. Upload to storage bucket
+
         const { error: uploadError } = await supabase.storage
           .from('study-materials')
           .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
-        // 2. Insert metadata into database
+        // --- Step 3: Insert document metadata into database ---
         const { data, error: dbError } = await supabase
           .from('documents')
           .insert({
@@ -187,25 +193,28 @@ export const Upload: React.FC = () => {
 
         if (dbError) throw dbError;
 
-        // 3. Insert chunks into document_chunks table
-        const chunkInserts = extractedPages.map((page, index) => ({
-          document_id: data.id,
-          chunk_index: index,
-          chunk_text: page.text,
-          page_number: page.pageNumber
-        }));
+        // --- Step 4: Insert text chunks (skip if no text was extracted) ---
+        const validChunks = extractedPages.filter(p => p.text.trim().length > 0);
+        if (validChunks.length > 0) {
+          const chunkInserts = validChunks.map((page, index) => ({
+            document_id: data.id,
+            chunk_index: index,
+            chunk_text: page.text,
+            page_number: page.pageNumber,
+          }));
 
-        const { error: chunkError } = await supabase
-          .from('document_chunks')
-          .insert(chunkInserts);
+          const { error: chunkError } = await supabase
+            .from('document_chunks')
+            .insert(chunkInserts);
 
-        if (chunkError) throw chunkError;
+          if (chunkError) console.warn('[Upload] Chunk insert failed:', chunkError.message);
+        }
 
         setFiles([data, ...files]);
       }
     } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || 'Failed to process and upload PDF file.');
+      console.error('[Upload] Upload failed:', err);
+      setErrorMsg(err.message || 'Failed to upload PDF file. Please try again.');
     } finally {
       setLoading(false);
     }
