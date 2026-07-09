@@ -65,7 +65,7 @@ const MOCK_QUESTIONS: Record<string, Question[]> = {
 };
 
 export const Quiz: React.FC = () => {
-  const { isMock } = useAuth();
+  const { isMock, profile } = useAuth();
   const [documents, setDocuments] = useState<any[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
@@ -78,7 +78,8 @@ export const Quiz: React.FC = () => {
 
   useEffect(() => {
     if (isMock) {
-      const stored = localStorage.getItem('studyys_files');
+      const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+      const stored = localStorage.getItem(filesKey);
       if (stored) {
         const parsed = JSON.parse(stored);
         setDocuments(parsed);
@@ -109,7 +110,7 @@ export const Quiz: React.FC = () => {
       };
       fetchSupabaseDocs();
     }
-  }, [isMock]);
+  }, [isMock, profile]);
 
   const startQuiz = async () => {
     setErrorMsg(null);
@@ -120,7 +121,8 @@ export const Quiz: React.FC = () => {
       const selectedDoc = documents.find((d) => d.id === selectedDocId);
       if (selectedDoc) {
         if (isMock) {
-          const stored = localStorage.getItem('studyys_files');
+          const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+          const stored = localStorage.getItem(filesKey);
           if (stored) {
             const parsed = JSON.parse(stored);
             const doc = parsed.find((d: any) => d.id === selectedDocId);
@@ -184,18 +186,89 @@ export const Quiz: React.FC = () => {
 
     const selectedDoc = documents.find((d) => d.id === selectedDocId);
 
-    // Log attempt history
-    const storedHistory = localStorage.getItem('studyys_history') || '[]';
-    const historyList = JSON.parse(storedHistory);
-    historyList.unshift({
-      id: `quiz-hist-${Date.now()}`,
-      type: 'Quiz Attempt',
-      title: `${selectedDoc?.title || 'General'} Quiz`,
-      detail: `Scored ${finalScore}% (${correctCount}/${questions.length} correct)`,
-      subject: selectedDoc?.subject || 'Engineering',
-      date: new Date().toLocaleDateString(),
-    });
-    localStorage.setItem('studyys_history', JSON.stringify(historyList));
+    // Save attempts for dashboard stats
+    if (isMock) {
+      if (profile) {
+        // Log attempt history
+        const histKey = `studyys_${profile.id}_history`;
+        const storedHistory = localStorage.getItem(histKey) || '[]';
+        const historyList = JSON.parse(storedHistory);
+        historyList.unshift({
+          id: `quiz-hist-${Date.now()}`,
+          type: 'Quiz Attempt',
+          title: `${selectedDoc?.title || 'General'} Quiz`,
+          detail: `Scored ${finalScore}% (${correctCount}/${questions.length} correct)`,
+          subject: selectedDoc?.subject || 'Engineering',
+          date: new Date().toLocaleDateString(),
+        });
+        localStorage.setItem(histKey, JSON.stringify(historyList));
+
+        // Save attempt details for score calculation
+        const attemptsKey = `studyys_${profile.id}_quiz_attempts`;
+        const attemptsStored = localStorage.getItem(attemptsKey) || '[]';
+        const attemptsList = JSON.parse(attemptsStored);
+        attemptsList.unshift({
+          id: `attempt-${Date.now()}`,
+          score: finalScore,
+          totalQuestions: questions.length,
+          date: new Date().toISOString(),
+        });
+        localStorage.setItem(attemptsKey, JSON.stringify(attemptsList));
+
+        // Save automatic study session duration (20 minutes per quiz)
+        const sessionsKey = `studyys_${profile.id}_study_sessions`;
+        const sessionsStored = localStorage.getItem(sessionsKey) || '[]';
+        const sessionsList = JSON.parse(sessionsStored);
+        sessionsList.unshift({
+          id: `session-${Date.now()}`,
+          duration_minutes: 20,
+          activity_type: 'quiz',
+          created_at: new Date().toISOString(),
+        });
+        localStorage.setItem(sessionsKey, JSON.stringify(sessionsList));
+      }
+    } else {
+      if (profile) {
+        // Real Supabase persistence
+        const saveSupabaseAttempt = async () => {
+          try {
+            // First, check or insert into quizzes to satisfy the foreign key constraint
+            const { data: quizData, error: quizError } = await supabase
+              .from('quizzes')
+              .insert({
+                creator_id: profile.id,
+                title: `${selectedDoc?.title || 'General'} Quiz`,
+                description: `Difficulty: ${difficulty}`,
+                subject_id: selectedDoc?.subject_id || null,
+                difficulty: difficulty
+              })
+              .select('id')
+              .single();
+
+            if (quizError) throw quizError;
+
+            // Now insert the attempt
+            await supabase.from('quiz_attempts').insert({
+              user_id: profile.id,
+              quiz_id: quizData.id,
+              score: finalScore,
+              total_questions: questions.length,
+            });
+
+            // Also insert study session
+            await supabase.from('study_sessions').insert({
+              user_id: profile.id,
+              subject_id: selectedDoc?.subject_id || null,
+              duration_minutes: 20,
+              activity_type: 'quiz',
+            });
+          } catch (err) {
+            console.error('Error saving quiz attempt to Supabase:', err);
+          }
+        };
+        saveSupabaseAttempt();
+      }
+    }
   };
 
   const resetQuiz = () => {

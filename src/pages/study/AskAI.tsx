@@ -31,7 +31,7 @@ interface DocumentOption {
 }
 
 export const AskAI: React.FC = () => {
-  const { isMock } = useAuth();
+  const { isMock, profile } = useAuth();
   const [documents, setDocuments] = useState<DocumentOption[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
@@ -43,7 +43,8 @@ export const AskAI: React.FC = () => {
   // Load documents for select box
   useEffect(() => {
     if (isMock) {
-      const stored = localStorage.getItem('studyys_files');
+      const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+      const stored = localStorage.getItem(filesKey);
       if (stored) {
         const parsed = JSON.parse(stored);
         setDocuments(parsed);
@@ -115,7 +116,8 @@ export const AskAI: React.FC = () => {
       const selectedDoc = documents.find((d) => d.id === selectedDocId);
       if (selectedDoc) {
         if (isMock) {
-          const stored = localStorage.getItem('studyys_files');
+          const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+          const stored = localStorage.getItem(filesKey);
           if (stored) {
             const parsed = JSON.parse(stored);
             const doc = parsed.find((d: any) => d.id === selectedDocId);
@@ -158,18 +160,68 @@ export const AskAI: React.FC = () => {
 
       setMessages((prev) => [...prev, aiMsg]);
       
-      // Save query history locally
-      const storedHistory = localStorage.getItem('studyys_history') || '[]';
-      const historyList = JSON.parse(storedHistory);
-      historyList.unshift({
-        id: `hist-${Date.now()}`,
-        type: 'AI Chat',
-        title: currentQuery,
-        detail: `Answered with ${Math.round(aiResponse.confidence * 100)}% confidence`,
-        subject: selectedDoc?.subject || 'Engineering',
-        date: new Date().toLocaleDateString(),
-      });
-      localStorage.setItem('studyys_history', JSON.stringify(historyList));
+      // Save history & stats
+      if (isMock) {
+        if (profile) {
+          // 1. History
+          const histKey = `studyys_${profile.id}_history`;
+          const storedHistory = localStorage.getItem(histKey) || '[]';
+          const historyList = JSON.parse(storedHistory);
+          historyList.unshift({
+            id: `hist-${Date.now()}`,
+            type: 'AI Chat',
+            title: currentQuery,
+            detail: `Answered with ${Math.round(aiResponse.confidence * 100)}% confidence`,
+            subject: selectedDoc?.subject || 'Engineering',
+            date: new Date().toLocaleDateString(),
+          });
+          localStorage.setItem(histKey, JSON.stringify(historyList));
+
+          // 2. Questions Asked Counter
+          const questionsKey = `studyys_${profile.id}_questions`;
+          const currentCount = parseInt(localStorage.getItem(questionsKey) || '0', 10);
+          localStorage.setItem(questionsKey, (currentCount + 1).toString());
+
+          // 3. Study Session (2 minutes per chat query)
+          const sessionsKey = `studyys_${profile.id}_study_sessions`;
+          const sessionsStored = localStorage.getItem(sessionsKey) || '[]';
+          const sessionsList = JSON.parse(sessionsStored);
+          sessionsList.unshift({
+            id: `session-${Date.now()}`,
+            duration_minutes: 2,
+            activity_type: 'chat',
+            created_at: new Date().toISOString(),
+          });
+          localStorage.setItem(sessionsKey, JSON.stringify(sessionsList));
+        }
+      } else {
+        if (profile) {
+          const saveSupabaseQuestion = async () => {
+            try {
+              await supabase.from('questions').insert({
+                user_id: profile.id,
+                document_id: selectedDocId || null,
+                query: currentQuery,
+                answer: aiResponse.answer,
+                referenced_pages: aiResponse.referencedPages || null,
+                confidence: aiResponse.confidence,
+                difficulty: difficulty
+              });
+
+              // Add to study sessions
+              await supabase.from('study_sessions').insert({
+                user_id: profile.id,
+                subject_id: selectedDoc?.subject_id || null,
+                duration_minutes: 2,
+                activity_type: 'chat',
+              });
+            } catch (dbErr) {
+              console.error('Error saving query to Supabase:', dbErr);
+            }
+          };
+          saveSupabaseQuestion();
+        }
+      }
 
     } catch (err: any) {
       console.error(err);

@@ -51,7 +51,7 @@ const DEFAULT_FLASHCARDS: Flashcard[] = [
 ];
 
 export const Flashcards: React.FC = () => {
-  const { isMock } = useAuth();
+  const { isMock, profile } = useAuth();
   const [documents, setDocuments] = useState<any[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
   const [topics, setTopics] = useState<string[]>([]);
@@ -64,7 +64,8 @@ export const Flashcards: React.FC = () => {
 
   useEffect(() => {
     if (isMock) {
-      const stored = localStorage.getItem('studyys_files');
+      const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+      const stored = localStorage.getItem(filesKey);
       if (stored) {
         const parsed = JSON.parse(stored);
         setDocuments(parsed);
@@ -95,7 +96,7 @@ export const Flashcards: React.FC = () => {
       };
       fetchSupabaseDocs();
     }
-  }, [isMock]);
+  }, [isMock, profile]);
 
   // Dynamically load topics when document is selected
   useEffect(() => {
@@ -105,7 +106,8 @@ export const Flashcards: React.FC = () => {
       try {
         let fullText = '';
         if (isMock) {
-          const stored = localStorage.getItem('studyys_files');
+          const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+          const stored = localStorage.getItem(filesKey);
           if (stored) {
             const parsed = JSON.parse(stored);
             const doc = parsed.find((d: any) => d.id === selectedDocId);
@@ -134,18 +136,48 @@ export const Flashcards: React.FC = () => {
     };
 
     loadTopics();
-  }, [selectedDocId, documents, isMock]);
+  }, [selectedDocId, documents, isMock, profile]);
 
   useEffect(() => {
-    // Load flashcards from localstorage or use defaults
-    const stored = localStorage.getItem('studyys_flashcards');
-    if (stored) {
-      setCards(JSON.parse(stored));
+    if (!profile) return;
+
+    if (isMock) {
+      const flashcardsKey = `studyys_${profile.id}_flashcards`;
+      const stored = localStorage.getItem(flashcardsKey);
+      if (stored) {
+        setCards(JSON.parse(stored));
+      } else {
+        setCards(DEFAULT_FLASHCARDS);
+        localStorage.setItem(flashcardsKey, JSON.stringify(DEFAULT_FLASHCARDS));
+      }
     } else {
-      setCards(DEFAULT_FLASHCARDS);
-      localStorage.setItem('studyys_flashcards', JSON.stringify(DEFAULT_FLASHCARDS));
+      const fetchSupabaseCards = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('flashcards')
+            .select('*')
+            .eq('user_id', profile.id);
+          if (error) throw error;
+          if (data && data.length > 0) {
+            setCards(data.map((c: any) => ({
+              id: c.id,
+              topic: c.topic,
+              question: c.question,
+              answer: c.answer,
+              isBookmarked: c.is_bookmarked,
+              revisionCount: c.revision_count || 0
+            })));
+          } else {
+            setCards(DEFAULT_FLASHCARDS);
+          }
+        } catch (err) {
+          console.error('Error loading flashcards from Supabase:', err);
+          setCards(DEFAULT_FLASHCARDS);
+        }
+      };
+      fetchSupabaseCards();
     }
-  }, []);
+  }, [isMock, profile]);
 
   const handleFlip = () => {
     setIsFlipped(!isFlipped);
@@ -172,20 +204,89 @@ export const Flashcards: React.FC = () => {
   };
 
   const incrementRevision = (idx: number) => {
+    const card = cards[idx];
+    if (!card) return;
+
+    const newRevCount = card.revisionCount + 1;
     const updated = cards.map((c, i) =>
-      i === idx ? { ...c, revisionCount: c.revisionCount + 1 } : c
+      i === idx ? { ...c, revisionCount: newRevCount } : c
     );
     setCards(updated);
-    localStorage.setItem('studyys_flashcards', JSON.stringify(updated));
+
+    if (isMock) {
+      if (profile) {
+        const flashcardsKey = `studyys_${profile.id}_flashcards`;
+        localStorage.setItem(flashcardsKey, JSON.stringify(updated));
+
+        // 1 minute of study session per flashcard revision
+        const sessionsKey = `studyys_${profile.id}_study_sessions`;
+        const sessionsStored = localStorage.getItem(sessionsKey) || '[]';
+        const sessionsList = JSON.parse(sessionsStored);
+        sessionsList.unshift({
+          id: `session-${Date.now()}`,
+          duration_minutes: 1,
+          activity_type: 'flashcard',
+          created_at: new Date().toISOString(),
+        });
+        localStorage.setItem(sessionsKey, JSON.stringify(sessionsList));
+      }
+    } else {
+      if (profile) {
+        const updateSupabase = async () => {
+          try {
+            if (!card.id.startsWith('fc-gen') && !card.id.startsWith('fc-')) {
+              await supabase
+                .from('flashcards')
+                .update({ revision_count: newRevCount })
+                .eq('id', card.id);
+            }
+
+            // Also insert study session
+            await supabase.from('study_sessions').insert({
+              user_id: profile.id,
+              duration_minutes: 1,
+              activity_type: 'flashcard',
+            });
+          } catch (err) {
+            console.error(err);
+          }
+        };
+        updateSupabase();
+      }
+    }
   };
 
   const toggleBookmark = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const card = cards.find(c => c.id === id);
+    if (!card) return;
+
+    const newBookmarked = !card.isBookmarked;
     const updated = cards.map((c) =>
-      c.id === id ? { ...c, isBookmarked: !c.isBookmarked } : c
+      c.id === id ? { ...c, isBookmarked: newBookmarked } : c
     );
     setCards(updated);
-    localStorage.setItem('studyys_flashcards', JSON.stringify(updated));
+
+    if (isMock) {
+      if (profile) {
+        const flashcardsKey = `studyys_${profile.id}_flashcards`;
+        localStorage.setItem(flashcardsKey, JSON.stringify(updated));
+      }
+    } else {
+      if (profile && !id.startsWith('fc-gen') && !id.startsWith('fc-')) {
+        const updateSupabase = async () => {
+          try {
+            await supabase
+              .from('flashcards')
+              .update({ is_bookmarked: newBookmarked })
+              .eq('id', id);
+          } catch (err) {
+            console.error(err);
+          }
+        };
+        updateSupabase();
+      }
+    }
   };
 
   const generateNewDeck = async (append = false) => {
@@ -196,7 +297,8 @@ export const Flashcards: React.FC = () => {
       const selectedDoc = documents.find((d) => d.id === selectedDocId);
       if (selectedDoc) {
         if (isMock) {
-          const stored = localStorage.getItem('studyys_files');
+          const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+          const stored = localStorage.getItem(filesKey);
           if (stored) {
             const parsed = JSON.parse(stored);
             const doc = parsed.find((d: any) => d.id === selectedDocId);
@@ -229,18 +331,61 @@ export const Flashcards: React.FC = () => {
         revisionCount: 0
       }));
 
-      if (append) {
-        const updated = [...cards, ...mappedCards];
-        setCards(updated);
-        localStorage.setItem('studyys_flashcards', JSON.stringify(updated));
-        // Move to the first new card in the appended deck
-        setCurrentIdx(cards.length);
-        setIsFlipped(false);
+      if (isMock) {
+        if (profile) {
+          const flashcardsKey = `studyys_${profile.id}_flashcards`;
+          if (append) {
+            const updated = [...cards, ...mappedCards];
+            setCards(updated);
+            localStorage.setItem(flashcardsKey, JSON.stringify(updated));
+            setCurrentIdx(cards.length);
+            setIsFlipped(false);
+          } else {
+            setCards(mappedCards);
+            localStorage.setItem(flashcardsKey, JSON.stringify(mappedCards));
+            setCurrentIdx(0);
+            setIsFlipped(false);
+          }
+        }
       } else {
-        setCards(mappedCards);
-        localStorage.setItem('studyys_flashcards', JSON.stringify(mappedCards));
-        setCurrentIdx(0);
-        setIsFlipped(false);
+        if (profile) {
+          const inserts = mappedCards.map(c => ({
+            user_id: profile.id,
+            document_id: selectedDocId || null,
+            question: c.question,
+            answer: c.answer,
+            topic: c.topic,
+            is_bookmarked: c.isBookmarked,
+            revision_count: c.revisionCount
+          }));
+
+          const { data, error } = await supabase
+            .from('flashcards')
+            .insert(inserts)
+            .select('*');
+
+          if (error) throw error;
+
+          if (data) {
+            const savedCards: Flashcard[] = data.map((c: any) => ({
+              id: c.id,
+              topic: c.topic,
+              question: c.question,
+              answer: c.answer,
+              isBookmarked: c.is_bookmarked,
+              revisionCount: c.revision_count || 0
+            }));
+            if (append) {
+              setCards(prev => [...prev, ...savedCards]);
+              setCurrentIdx(cards.length);
+              setIsFlipped(false);
+            } else {
+              setCards(savedCards);
+              setCurrentIdx(0);
+              setIsFlipped(false);
+            }
+          }
+        }
       }
     } catch (err: any) {
       console.error(err);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../services/supabase';
 import {
   FileText,
   MessageSquare,
@@ -35,33 +36,245 @@ const chartData = [
 ];
 
 export const Dashboard: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, isMock } = useAuth();
   const [loading, setLoading] = useState(true);
 
+  const [uploadedPdfsCount, setUploadedPdfsCount] = useState(0);
+  const [questionsAskedCount, setQuestionsAskedCount] = useState(0);
+  const [flashcardsReviewedCount, setFlashcardsReviewedCount] = useState(0);
+  const [quizAttemptsCount, setQuizAttemptsCount] = useState(0);
+  const [avgQuizScoreValue, setAvgQuizScoreValue] = useState(0);
+  const [studyHoursCount, setStudyHoursCount] = useState(0.0);
+  
+  const [recentDocs, setRecentDocs] = useState<any[]>([]);
+  const [recentChats, setRecentChats] = useState<any[]>([]);
+  const [weeklyData, setWeeklyData] = useState<any[]>(chartData);
+
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, []);
+    if (!profile) return;
+    setLoading(true);
+
+    const loadDashboardStats = async () => {
+      try {
+        if (isMock) {
+          // 1. Files count & list
+          const filesKey = `studyys_${profile.id}_files`;
+          const storedFiles = localStorage.getItem(filesKey);
+          const filesList = storedFiles ? JSON.parse(storedFiles) : [];
+          setUploadedPdfsCount(filesList.length);
+          setRecentDocs(filesList.slice(0, 3).map((f: any) => ({
+            id: f.id,
+            title: f.title,
+            size: `${(f.file_size / (1024 * 1024)).toFixed(1)} MB`,
+            date: new Date(f.created_at).toLocaleDateString(),
+            subject: f.subject
+          })));
+
+          // 2. Questions asked count
+          const questionsKey = `studyys_${profile.id}_questions`;
+          const questionsCount = parseInt(localStorage.getItem(questionsKey) || '0', 10);
+          setQuestionsAskedCount(questionsCount);
+
+          // 3. Flashcards reviewed count
+          const cardsKey = `studyys_${profile.id}_flashcards`;
+          const cardsList = JSON.parse(localStorage.getItem(cardsKey) || '[]');
+          const revCount = cardsList.reduce((acc: number, card: any) => acc + (card.revision_count || card.revisionCount || 0), 0);
+          setFlashcardsReviewedCount(revCount);
+
+          // 4. Quiz Attempts & Avg Score
+          const attemptsKey = `studyys_${profile.id}_quiz_attempts`;
+          const attemptsList = JSON.parse(localStorage.getItem(attemptsKey) || '[]');
+          setQuizAttemptsCount(attemptsList.length);
+          if (attemptsList.length > 0) {
+            const totalScore = attemptsList.reduce((acc: number, attempt: any) => acc + attempt.score, 0);
+            setAvgQuizScoreValue(Math.round(totalScore / attemptsList.length));
+          } else {
+            setAvgQuizScoreValue(0);
+          }
+
+          // 5. Study Hours
+          const sessionsKey = `studyys_${profile.id}_study_sessions`;
+          const sessionsList = JSON.parse(localStorage.getItem(sessionsKey) || '[]');
+          const totalMin = sessionsList.reduce((acc: number, session: any) => acc + session.duration_minutes, 0);
+          setStudyHoursCount(parseFloat((totalMin / 60).toFixed(1)));
+
+          // 6. Recent Chats (filters history type AI Chat)
+          const histKey = `studyys_${profile.id}_history`;
+          const histList = JSON.parse(localStorage.getItem(histKey) || '[]');
+          const chatHist = histList.filter((h: any) => h.type === 'AI Chat').slice(0, 3);
+          setRecentChats(chatHist.map((h: any) => ({
+            id: h.id,
+            question: h.title,
+            doc: h.subject
+          })));
+
+          // 7. Weekly Trends Chart aggregation
+          const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          const dayMap = days.reduce((acc: any, d) => {
+            acc[d] = { day: d, hours: 0, scoreCount: 0, scoreSum: 0 };
+            return acc;
+          }, {});
+
+          sessionsList.forEach((s: any) => {
+            const date = new Date(s.created_at || s.date);
+            let dayIdx = date.getDay() - 1;
+            if (dayIdx < 0) dayIdx = 6;
+            const dayName = days[dayIdx];
+            if (dayName) {
+              dayMap[dayName].hours += (s.duration_minutes || 0) / 60;
+            }
+          });
+
+          attemptsList.forEach((a: any) => {
+            const date = new Date(a.created_at || a.date);
+            let dayIdx = date.getDay() - 1;
+            if (dayIdx < 0) dayIdx = 6;
+            const dayName = days[dayIdx];
+            if (dayName) {
+              dayMap[dayName].scoreSum += a.score;
+              dayMap[dayName].scoreCount += 1;
+            }
+          });
+
+          const updatedChartData = days.map(d => {
+            const hours = parseFloat(dayMap[d].hours.toFixed(1));
+            const avgScore = dayMap[d].scoreCount > 0 ? Math.round(dayMap[d].scoreSum / dayMap[d].scoreCount) : 0;
+            return {
+              day: d,
+              hours: hours,
+              score: avgScore
+            };
+          });
+
+          const hasData = updatedChartData.some(d => d.hours > 0 || d.score > 0);
+          setWeeklyData(hasData ? updatedChartData : chartData);
+        } else {
+          // --- Real Supabase Mode ---
+          // 1. Files
+          const { data: docs } = await supabase
+            .from('documents')
+            .select('*')
+            .eq('user_id', profile.id)
+            .order('created_at', { ascending: false });
+          
+          const docsCount = docs ? docs.length : 0;
+          setUploadedPdfsCount(docsCount);
+          setRecentDocs((docs || []).slice(0, 3).map((f: any) => ({
+            id: f.id,
+            title: f.title,
+            size: `${(f.file_size / (1024 * 1024)).toFixed(1)} MB`,
+            date: new Date(f.created_at).toLocaleDateString(),
+            subject: f.subject_id || 'Engineering'
+          })));
+
+          // 2. Questions Asked Count
+          const { count: qCount } = await supabase
+            .from('questions')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', profile.id);
+          setQuestionsAskedCount(qCount || 0);
+
+          // 3. Flashcards Reviewed Count
+          const { data: cards } = await supabase
+            .from('flashcards')
+            .select('revision_count')
+            .eq('user_id', profile.id);
+          const revCount = (cards || []).reduce((acc, c) => acc + (c.revision_count || 0), 0);
+          setFlashcardsReviewedCount(revCount);
+
+          // 4. Quiz Attempts & Score
+          const { data: attempts } = await supabase
+            .from('quiz_attempts')
+            .select('score, created_at')
+            .eq('user_id', profile.id);
+          const attCount = attempts ? attempts.length : 0;
+          setQuizAttemptsCount(attCount);
+          if (attCount > 0) {
+            const totalScore = (attempts || []).reduce((acc, a) => acc + a.score, 0);
+            setAvgQuizScoreValue(Math.round(totalScore / attCount));
+          } else {
+            setAvgQuizScoreValue(0);
+          }
+
+          // 5. Study Hours
+          const { data: sessions } = await supabase
+            .from('study_sessions')
+            .select('duration_minutes, created_at')
+            .eq('user_id', profile.id);
+          const totalMin = (sessions || []).reduce((acc, s) => acc + s.duration_minutes, 0);
+          setStudyHoursCount(parseFloat((totalMin / 60).toFixed(1)));
+
+          // 6. Recent Chats
+          const { data: qList } = await supabase
+            .from('questions')
+            .select('id, query, document_id')
+            .eq('user_id', profile.id)
+            .order('created_at', { ascending: false })
+            .limit(3);
+          setRecentChats((qList || []).map((q: any) => ({
+            id: q.id,
+            question: q.query,
+            doc: q.document_id ? 'Document Query' : 'General Query'
+          })));
+
+          // 7. Weekly trends from sessions & attempts
+          const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          const dayMap = days.reduce((acc: any, d) => {
+            acc[d] = { day: d, hours: 0, scoreCount: 0, scoreSum: 0 };
+            return acc;
+          }, {});
+
+          (sessions || []).forEach((s: any) => {
+            const date = new Date(s.created_at);
+            let dayIdx = date.getDay() - 1;
+            if (dayIdx < 0) dayIdx = 6;
+            const dayName = days[dayIdx];
+            if (dayName) {
+              dayMap[dayName].hours += (s.duration_minutes || 0) / 60;
+            }
+          });
+
+          (attempts || []).forEach((a: any) => {
+            const date = new Date(a.created_at);
+            let dayIdx = date.getDay() - 1;
+            if (dayIdx < 0) dayIdx = 6;
+            const dayName = days[dayIdx];
+            if (dayName) {
+              dayMap[dayName].scoreSum += a.score;
+              dayMap[dayName].scoreCount += 1;
+            }
+          });
+
+          const updatedChartData = days.map(d => {
+            const hours = parseFloat(dayMap[d].hours.toFixed(1));
+            const avgScore = dayMap[d].scoreCount > 0 ? Math.round(dayMap[d].scoreSum / dayMap[d].scoreCount) : 0;
+            return {
+              day: d,
+              hours: hours,
+              score: avgScore
+            };
+          });
+
+          const hasData = updatedChartData.some(d => d.hours > 0 || d.score > 0);
+          setWeeklyData(hasData ? updatedChartData : chartData);
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardStats();
+  }, [profile, isMock]);
 
   const stats = [
-    { name: 'Uploaded PDFs', value: '12', icon: FileText, color: 'text-blue-600 bg-blue-50 border-blue-100' },
-    { name: 'Questions Asked', value: '47', icon: MessageSquare, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
-    { name: 'Flashcards Reviewed', value: '128', icon: Layers, color: 'text-purple-600 bg-purple-50 border-purple-100' },
-    { name: 'Quiz Attempts', value: '9', icon: Award, color: 'text-amber-600 bg-amber-50 border-amber-100' },
-    { name: 'Average Quiz Score', value: '84%', icon: TrendingUp, color: 'text-brand-600 bg-brand-50 border-brand-100' },
-    { name: 'Study Hours', value: '21.5h', icon: Clock, color: 'text-rose-600 bg-rose-50 border-rose-100' },
-  ];
-
-  const recentDocs = [
-    { id: '1', title: 'Operating Systems - Lecture Notes 4.pdf', size: '2.4 MB', date: '2 hours ago', subject: 'Operating Systems' },
-    { id: '2', title: 'Data Structures and Algorithms - Midterm Syllabus.pdf', size: '4.1 MB', date: 'Yesterday', subject: 'Data Structures' },
-    { id: '3', title: 'Computer Networks - Lab Manual.pdf', size: '1.8 MB', date: '3 days ago', subject: 'Computer Networks' },
-  ];
-
-  const recentChats = [
-    { id: '1', question: 'Explain the working of Dijkstra algorithm in detail', doc: 'Data Structures Midterm' },
-    { id: '2', question: 'What is the difference between TCP and UDP headers?', doc: 'Computer Networks Lab' },
-    { id: '3', question: 'How does virtual memory paging work?', doc: 'Operating Systems Notes' },
+    { name: 'Uploaded PDFs', value: uploadedPdfsCount.toString(), icon: FileText, color: 'text-blue-600 bg-blue-50 border-blue-100' },
+    { name: 'Questions Asked', value: questionsAskedCount.toString(), icon: MessageSquare, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+    { name: 'Flashcards Reviewed', value: flashcardsReviewedCount.toString(), icon: Layers, color: 'text-purple-600 bg-purple-50 border-purple-100' },
+    { name: 'Quiz Attempts', value: quizAttemptsCount.toString(), icon: Award, color: 'text-amber-600 bg-amber-50 border-amber-100' },
+    { name: 'Average Quiz Score', value: `${avgQuizScoreValue}%`, icon: TrendingUp, color: 'text-brand-600 bg-brand-50 border-brand-100' },
+    { name: 'Study Hours', value: `${studyHoursCount}h`, icon: Clock, color: 'text-rose-600 bg-rose-50 border-rose-100' },
   ];
 
   if (loading) {
@@ -162,7 +375,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0e8ce2" stopOpacity={0.2} />
@@ -189,7 +402,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={weeklyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" className="dark:opacity-10" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} domain={[0, 100]} />

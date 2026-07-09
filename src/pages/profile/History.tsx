@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../services/supabase';
 import {
   History as HistoryIcon,
   Search,
@@ -59,20 +60,98 @@ const DEFAULT_HISTORY: HistoryItem[] = [
 ];
 
 export const History: React.FC = () => {
+  const { isMock, profile } = useAuth();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [subjectFilter, setSubjectFilter] = useState('All');
 
   useEffect(() => {
-    const stored = localStorage.getItem('studyys_history');
-    if (stored) {
-      setHistory(JSON.parse(stored));
+    if (!profile) return;
+
+    if (isMock) {
+      const histKey = `studyys_${profile.id}_history`;
+      const stored = localStorage.getItem(histKey);
+      if (stored) {
+        setHistory(JSON.parse(stored));
+      } else {
+        const isPreseeded = ['mock-student-id', 'mock-mod-id', 'mock-admin-id'].includes(profile?.id || '');
+        const mockHist = isPreseeded ? DEFAULT_HISTORY : [];
+        setHistory(mockHist);
+        localStorage.setItem(histKey, JSON.stringify(mockHist));
+      }
     } else {
-      setHistory(DEFAULT_HISTORY);
-      localStorage.setItem('studyys_history', JSON.stringify(DEFAULT_HISTORY));
+      const fetchSupabaseHistory = async () => {
+        try {
+          // Fetch questions
+          const { data: qData } = await supabase
+            .from('questions')
+            .select('id, query, confidence, created_at')
+            .eq('user_id', profile.id);
+
+          // Fetch quiz attempts
+          const { data: qAttempts } = await supabase
+            .from('quiz_attempts')
+            .select('id, score, total_questions, created_at, quizzes (title, subject_id, subjects (name))')
+            .eq('user_id', profile.id);
+
+          // Fetch uploaded docs
+          const { data: docs } = await supabase
+            .from('documents')
+            .select('id, title, file_size, created_at')
+            .eq('user_id', profile.id);
+
+          const items: HistoryItem[] = [];
+
+          if (qData) {
+            qData.forEach((q: any) => {
+              items.push({
+                id: q.id,
+                type: 'AI Chat',
+                title: q.query,
+                detail: `Answered with ${Math.round(parseFloat(q.confidence || '0') * 100)}% confidence`,
+                subject: 'AI Assistant',
+                date: new Date(q.created_at).toLocaleDateString()
+              });
+            });
+          }
+
+          if (qAttempts) {
+            qAttempts.forEach((a: any) => {
+              items.push({
+                id: a.id,
+                type: 'Quiz Attempt',
+                title: `${a.quizzes?.title || 'General'} Quiz`,
+                detail: `Scored ${a.score}% (${Math.round(a.score / 100 * a.total_questions)}/${a.total_questions} correct)`,
+                subject: a.quizzes?.subjects?.name || 'Engineering',
+                date: new Date(a.created_at).toLocaleDateString()
+              });
+            });
+          }
+
+          if (docs) {
+            docs.forEach((d: any) => {
+              items.push({
+                id: d.id,
+                type: 'PDF Upload',
+                title: d.title,
+                detail: `Uploaded successfully (${(d.file_size / (1024 * 1024)).toFixed(1)} MB)`,
+                subject: 'Document',
+                date: new Date(d.created_at).toLocaleDateString()
+              });
+            });
+          }
+
+          // Sort descending by date
+          items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setHistory(items);
+        } catch (err) {
+          console.error('Error fetching history:', err);
+        }
+      };
+      fetchSupabaseHistory();
     }
-  }, []);
+  }, [isMock, profile]);
 
   const getIcon = (type: string) => {
     switch (type) {

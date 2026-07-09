@@ -41,11 +41,14 @@ export const Upload: React.FC = () => {
   // Load files
   useEffect(() => {
     if (isMock) {
-      const stored = localStorage.getItem('studyys_files');
+      const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+      const stored = localStorage.getItem(filesKey);
       if (stored) {
         setFiles(JSON.parse(stored));
       } else {
-        const mockFiles: UploadedFile[] = [
+        // Pre-populate only for default mock profiles, start fresh for new mock profiles
+        const isPreseeded = ['mock-student-id', 'mock-mod-id', 'mock-admin-id'].includes(profile?.id || '');
+        const mockFiles: UploadedFile[] = isPreseeded ? [
           {
             id: 'doc-1',
             title: 'Operating Systems - Lecture Notes 4.pdf',
@@ -64,14 +67,14 @@ export const Upload: React.FC = () => {
             status: 'completed',
             created_at: new Date(Date.now() - 3600 * 24000).toISOString(),
           },
-        ];
+        ] : [];
         setFiles(mockFiles);
-        localStorage.setItem('studyys_files', JSON.stringify(mockFiles));
+        localStorage.setItem(filesKey, JSON.stringify(mockFiles));
       }
     } else {
       fetchSupabaseFiles();
     }
-  }, [isMock]);
+  }, [isMock, profile]);
 
   const fetchSupabaseFiles = async () => {
     try {
@@ -163,7 +166,8 @@ export const Upload: React.FC = () => {
 
         const updated = [newDoc, ...files];
         setFiles(updated);
-        localStorage.setItem('studyys_files', JSON.stringify(updated));
+        const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+        localStorage.setItem(filesKey, JSON.stringify(updated));
         setLoading(false);
       } else {
         // --- Step 2: Upload file to Supabase storage ---
@@ -225,7 +229,8 @@ export const Upload: React.FC = () => {
       if (isMock) {
         const filtered = files.filter((f) => f.id !== id);
         setFiles(filtered);
-        localStorage.setItem('studyys_files', JSON.stringify(filtered));
+        const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+        localStorage.setItem(filesKey, JSON.stringify(filtered));
       } else {
         try {
           const fileToDelete = files.find((f) => f.id === id);
