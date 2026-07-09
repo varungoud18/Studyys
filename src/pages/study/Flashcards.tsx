@@ -75,11 +75,17 @@ export const Flashcards: React.FC = () => {
         try {
           const { data, error } = await supabase
             .from('documents')
-            .select('id, title, subject')
+            .select('id, title, subject_id, subjects (name)')
             .eq('status', 'completed');
+          if (error) throw error;
           if (data && data.length > 0) {
-            setDocuments(data);
-            setSelectedDocId(data[0].id);
+            const docsList = data.map((d: any) => ({
+              id: d.id,
+              title: d.title,
+              subject: d.subjects?.name || 'Engineering',
+            }));
+            setDocuments(docsList);
+            setSelectedDocId(docsList[0].id);
           }
         } catch (err) {
           console.error('Error fetching supabase documents:', err);

@@ -63,14 +63,15 @@ export const AskAI: React.FC = () => {
         try {
           const { data, error } = await supabase
             .from('documents')
-            .select('id, title, subject')
+            .select('id, title, subject_id, subjects (name)')
             .eq('status', 'completed');
+          if (error) throw error;
           if (data && data.length > 0) {
             // Map keys to align with our local structures
             const docsList = data.map((d: any) => ({
               id: d.id,
               title: d.title,
-              subject: d.subject || 'Engineering',
+              subject: d.subjects?.name || 'Engineering',
             }));
             setDocuments(docsList);
             setSelectedDocId(docsList[0].id);
