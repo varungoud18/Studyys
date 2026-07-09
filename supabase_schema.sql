@@ -205,31 +205,96 @@ ALTER TABLE public.library_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- 1. Profile Policies
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON public.profiles;
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles
   FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
 -- 2. Document Policies
+DROP POLICY IF EXISTS "Users can insert their own documents" ON public.documents;
 CREATE POLICY "Users can insert their own documents" ON public.documents
   FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can view their own documents" ON public.documents;
 CREATE POLICY "Users can view their own documents" ON public.documents
   FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own documents" ON public.documents;
 CREATE POLICY "Users can delete their own documents" ON public.documents
   FOR DELETE USING (auth.uid() = user_id);
 
+-- 2.1. Document Chunks Policies
+DROP POLICY IF EXISTS "Users can insert chunks for their own documents" ON public.document_chunks;
+CREATE POLICY "Users can insert chunks for their own documents" ON public.document_chunks
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.documents
+      WHERE id = document_id AND user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can view chunks for their own documents" ON public.document_chunks;
+CREATE POLICY "Users can view chunks for their own documents" ON public.document_chunks
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.documents
+      WHERE id = document_id AND user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can delete chunks for their own documents" ON public.document_chunks;
+CREATE POLICY "Users can delete chunks for their own documents" ON public.document_chunks
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM public.documents
+      WHERE id = document_id AND user_id = auth.uid()
+    )
+  );
+
 -- 3. Study Helper Policies (AI Questions, Flashcards, Quizzes)
+DROP POLICY IF EXISTS "Users can view their own questions" ON public.questions;
 CREATE POLICY "Users can view their own questions" ON public.questions
   FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert their own questions" ON public.questions;
 CREATE POLICY "Users can insert their own questions" ON public.questions
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can manage their own flashcards" ON public.flashcards;
 CREATE POLICY "Users can manage their own flashcards" ON public.flashcards
   FOR ALL USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can manage their own quizzes" ON public.quizzes;
+CREATE POLICY "Users can manage their own quizzes" ON public.quizzes
+  FOR ALL USING (auth.uid() = creator_id);
+
+DROP POLICY IF EXISTS "Users can manage questions for their own quizzes" ON public.quiz_questions;
+CREATE POLICY "Users can manage questions for their own quizzes" ON public.quiz_questions
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.quizzes
+      WHERE id = quiz_id AND creator_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can manage their own attempts" ON public.quiz_attempts;
+CREATE POLICY "Users can manage their own attempts" ON public.quiz_attempts
+  FOR ALL USING (auth.uid() = user_id);
+
+-- 3.1. Notifications Policies
+DROP POLICY IF EXISTS "Users can manage their own notifications" ON public.notifications;
+CREATE POLICY "Users can manage their own notifications" ON public.notifications
+  FOR ALL USING (auth.uid() = user_id);
+
 -- 4. Shared Library Policies
+DROP POLICY IF EXISTS "Anyone can view approved notes" ON public.library_notes;
 CREATE POLICY "Anyone can view approved notes" ON public.library_notes
   FOR SELECT USING (status = 'approved');
+
+DROP POLICY IF EXISTS "Moderators can view all notes" ON public.library_notes;
 CREATE POLICY "Moderators can view all notes" ON public.library_notes
   FOR SELECT USING (
     EXISTS (
@@ -237,8 +302,12 @@ CREATE POLICY "Moderators can view all notes" ON public.library_notes
       WHERE id = auth.uid() AND role IN ('moderator', 'admin')
     )
   );
+
+DROP POLICY IF EXISTS "Users can publish notes" ON public.library_notes;
 CREATE POLICY "Users can publish notes" ON public.library_notes
   FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Moderators can update/delete notes" ON public.library_notes;
 CREATE POLICY "Moderators can update/delete notes" ON public.library_notes
   FOR ALL USING (
     EXISTS (
@@ -264,6 +333,28 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE TRIGGER on_auth_user_created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- =========================================================================
+-- STORAGE BUCKETS AND POLICIES SETUP
+-- =========================================================================
+-- Note: Ensure the 'study-materials' bucket is created in your storage dashboard.
+-- The policies below enable authenticated users to upload, read, and delete their own files.
+
+DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
+CREATE POLICY "Allow authenticated uploads" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'study-materials');
+
+DROP POLICY IF EXISTS "Allow authenticated reads" ON storage.objects;
+CREATE POLICY "Allow authenticated reads" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'study-materials');
+
+DROP POLICY IF EXISTS "Allow authenticated deletes" ON storage.objects;
+CREATE POLICY "Allow authenticated deletes" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'study-materials');
