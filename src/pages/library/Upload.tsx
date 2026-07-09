@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../services/supabase';
+import { CATEGORIZED_SUBJECTS, ALL_SUBJECTS, DEFAULT_SUBJECT } from '../../services/subjects';
+import { extractTextFromPdf } from '../../services/pdfParser';
 import {
   Upload as UploadIcon,
   FileText,
@@ -22,23 +24,15 @@ interface UploadedFile {
   pages_count: number;
   status: 'processing' | 'completed' | 'failed';
   created_at: string;
+  extracted_text?: { pageNumber: number; text: string }[];
 }
-
-const DEFAULT_SUBJECTS = [
-  'Operating Systems',
-  'Data Structures & Algorithms',
-  'Computer Networks',
-  'Database Management Systems',
-  'Compiler Design',
-  'Mathematics for Engineers',
-];
 
 export const Upload: React.FC = () => {
   const { isMock, profile } = useAuth();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [selectedSubject, setSelectedSubject] = useState(DEFAULT_SUBJECTS[0]);
+  const [selectedSubject, setSelectedSubject] = useState(DEFAULT_SUBJECT);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<'title' | 'created_at'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -142,38 +136,30 @@ export const Upload: React.FC = () => {
 
     setLoading(true);
 
-    if (isMock) {
-      // Create Mock Document
-      const newDocId = `doc-${Math.random().toString(36).substr(2, 9)}`;
-      const newDoc: UploadedFile = {
-        id: newDocId,
-        title: file.name,
-        file_size: file.size,
-        subject: selectedSubject,
-        pages_count: Math.floor(Math.random() * 25) + 5,
-        status: 'processing',
-        created_at: new Date().toISOString(),
-      };
+    try {
+      // Extract text content from PDF first on client-side
+      const extractedPages = await extractTextFromPdf(file);
 
-      const updated = [newDoc, ...files];
-      setFiles(updated);
-      localStorage.setItem('studyys_files', JSON.stringify(updated));
+      if (isMock) {
+        // Create Mock Document
+        const newDocId = `doc-${Math.random().toString(36).substr(2, 9)}`;
+        const newDoc: UploadedFile = {
+          id: newDocId,
+          title: file.name,
+          file_size: file.size,
+          subject: selectedSubject,
+          pages_count: extractedPages.length,
+          status: 'completed',
+          created_at: new Date().toISOString(),
+          extracted_text: extractedPages,
+        };
 
-      // Simulate parsing delay then update status to completed
-      setTimeout(() => {
-        setFiles((prev) => {
-          const completed = prev.map((f) =>
-            f.id === newDocId ? { ...f, status: 'completed' as const } : f
-          );
-          localStorage.setItem('studyys_files', JSON.stringify(completed));
-          return completed;
-        });
-      }, 3000);
-
-      setLoading(false);
-    } else {
-      // Supabase storage upload
-      try {
+        const updated = [newDoc, ...files];
+        setFiles(updated);
+        localStorage.setItem('studyys_files', JSON.stringify(updated));
+        setLoading(false);
+      } else {
+        // Supabase storage upload
         const filePath = `${profile?.id}/${Date.now()}_${file.name}`;
         
         // 1. Upload to storage bucket
@@ -192,8 +178,8 @@ export const Upload: React.FC = () => {
             file_path: filePath,
             file_size: file.size,
             file_type: 'application/pdf',
-            subject_id: null, // can link later
-            pages_count: 10,  // will be processed client side
+            subject_id: null,
+            pages_count: extractedPages.length,
             status: 'completed',
           })
           .select()
@@ -201,13 +187,27 @@ export const Upload: React.FC = () => {
 
         if (dbError) throw dbError;
 
+        // 3. Insert chunks into document_chunks table
+        const chunkInserts = extractedPages.map((page, index) => ({
+          document_id: data.id,
+          chunk_index: index,
+          chunk_text: page.text,
+          page_number: page.pageNumber
+        }));
+
+        const { error: chunkError } = await supabase
+          .from('document_chunks')
+          .insert(chunkInserts);
+
+        if (chunkError) throw chunkError;
+
         setFiles([data, ...files]);
-      } catch (err: any) {
-        console.error(err);
-        setErrorMsg(err.message || 'Failed to upload file.');
-      } finally {
-        setLoading(false);
       }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Failed to process and upload PDF file.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -265,8 +265,8 @@ export const Upload: React.FC = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-black text-slate-800 tracking-tight">Upload Study Material</h2>
-        <p className="text-slate-500 text-sm">
+        <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Upload Study Material</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">
           Add textbook sections, syllabi, or notes. Gemini will chunk and parse them for learning.
         </p>
       </div>
@@ -274,8 +274,8 @@ export const Upload: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Upload Zone Panel */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">Upload Form</h3>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-4">Upload Form</h3>
             
             {errorMsg && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-xl mb-4 flex items-start gap-2">
@@ -286,18 +286,22 @@ export const Upload: React.FC = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
                   Select Subject
                 </label>
                 <select
                   value={selectedSubject}
                   onChange={(e) => setSelectedSubject(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm bg-white"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
                 >
-                  {DEFAULT_SUBJECTS.map((sub) => (
-                    <option key={sub} value={sub}>
-                      {sub}
-                    </option>
+                  {Object.entries(CATEGORIZED_SUBJECTS).map(([category, subs]) => (
+                    <optgroup key={category} label={category} className="dark:bg-slate-800 dark:text-slate-200">
+                      {subs.map((sub) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -309,8 +313,8 @@ export const Upload: React.FC = () => {
                 onDrop={handleDrop}
                 className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition ${
                   dragging
-                    ? 'border-brand-500 bg-brand-50/50'
-                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/30'
+                    ? 'border-brand-500 bg-brand-50/50 dark:bg-brand-500/10'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/30 dark:hover:bg-slate-800/10'
                 }`}
                 onClick={() => document.getElementById('file-input')?.click()}
               >
@@ -321,12 +325,12 @@ export const Upload: React.FC = () => {
                   accept=".pdf"
                   onChange={handleFileChange}
                 />
-                <div className="p-4 bg-blue-50 text-brand-500 rounded-2xl mb-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/20 text-brand-500 rounded-2xl mb-4">
                   <UploadIcon className="w-8 h-8" />
                 </div>
-                <p className="text-sm font-bold text-slate-700">Drag & drop your PDF file here</p>
-                <p className="text-xs text-slate-400 mt-1">or click to browse from device</p>
-                <div className="mt-4 text-[10px] text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Drag & drop your PDF file here</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">or click to browse from device</p>
+                <div className="mt-4 text-[10px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-850 px-3 py-1 rounded-full">
                   PDF format &bull; Max 15 MB
                 </div>
               </div>
@@ -336,9 +340,9 @@ export const Upload: React.FC = () => {
 
         {/* Uploaded Files Table list */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <FolderOpen className="w-5 h-5 text-brand-500" />
                 <span>Uploaded Documents ({files.length})</span>
               </h3>
@@ -351,7 +355,7 @@ export const Upload: React.FC = () => {
                   placeholder="Search uploaded files..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
                 />
               </div>
             </div>
@@ -359,9 +363,9 @@ export const Upload: React.FC = () => {
             {/* List */}
             {filteredFiles.length === 0 ? (
               <div className="py-16 text-center">
-                <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm font-bold text-slate-500">No documents found</p>
-                <p className="text-xs text-slate-400 mt-1">
+                <FileText className="w-12 h-12 text-slate-300 dark:text-slate-750 mx-auto mb-3" />
+                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No documents found</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   Upload a PDF using the form on the left to get started.
                 </p>
               </div>
@@ -369,9 +373,9 @@ export const Upload: React.FC = () => {
               <div className="overflow-x-auto scrollbar-thin">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-100 text-slate-400 font-bold">
+                    <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-bold">
                       <th
-                        className="pb-3 cursor-pointer hover:text-slate-600"
+                        className="pb-3 cursor-pointer hover:text-slate-600 dark:hover:text-slate-305"
                         onClick={() => handleSort('title')}
                       >
                         <div className="flex items-center gap-1">
@@ -385,42 +389,42 @@ export const Upload: React.FC = () => {
                       <th className="pb-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800/40">
                     {filteredFiles.map((file) => (
-                      <tr key={file.id} className="hover:bg-slate-50/50 group transition">
-                        <td className="py-4 font-semibold text-slate-800 max-w-xs truncate">
+                      <tr key={file.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 group transition">
+                        <td className="py-4 font-semibold text-slate-800 dark:text-slate-205 max-w-xs truncate">
                           {file.title}
                         </td>
-                        <td className="py-4 text-slate-500">{file.subject}</td>
-                        <td className="py-4 text-slate-500">{file.pages_count}</td>
-                        <td className="py-4 text-slate-500">{formatSize(file.file_size)}</td>
+                        <td className="py-4 text-slate-500 dark:text-slate-400">{file.subject}</td>
+                        <td className="py-4 text-slate-500 dark:text-slate-400">{file.pages_count}</td>
+                        <td className="py-4 text-slate-500 dark:text-slate-400">{formatSize(file.file_size)}</td>
                         <td className="py-4">
                           {file.status === 'completed' && (
-                            <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-100">
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-100 dark:border-emerald-800/50">
                               <CheckCircle className="w-3 h-3" /> Ready
                             </span>
                           )}
                           {file.status === 'processing' && (
-                            <span className="inline-flex items-center gap-1 text-[10px] bg-blue-50 text-brand-600 font-bold px-2 py-0.5 rounded-full border border-blue-100 animate-pulse">
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-blue-50 dark:bg-blue-950/20 text-brand-600 dark:text-brand-400 font-bold px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800/50 animate-pulse">
                               <Clock className="w-3 h-3 animate-spin" /> Processing
                             </span>
                           )}
                           {file.status === 'failed' && (
-                            <span className="inline-flex items-center gap-1 text-[10px] bg-red-50 text-red-600 font-bold px-2 py-0.5 rounded-full border border-red-100">
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-bold px-2 py-0.5 rounded-full border border-red-100 dark:border-red-800/50">
                               <AlertCircle className="w-3 h-3" /> Error
                             </span>
                           )}
                         </td>
                         <td className="py-4 text-right space-x-2">
                           <button
-                            className="p-1.5 text-slate-400 hover:text-brand-500 hover:bg-brand-50 rounded-lg transition"
+                            className="p-1.5 text-slate-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition"
                             title="Preview File"
                           >
                             <Eye className="w-4.5 h-4.5" />
                           </button>
                           <button
                             onClick={() => handleDelete(file.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition"
                             title="Delete File"
                           >
                             <Trash2 className="w-4.5 h-4.5" />

@@ -127,3 +127,129 @@ Here is the academic breakdown of your question under **${difficulty}** mode:
     }, 1500);
   });
 };
+
+export interface QuizQuestion {
+  question_text: string;
+  options: string[];
+  correct_option_index: number;
+  explanation: string;
+}
+
+export const generateQuizFromText = async (
+  contextText: string,
+  difficulty: 'easy' | 'medium' | 'hard'
+): Promise<QuizQuestion[]> => {
+  if (!genAI) {
+    return [
+      {
+        question_text: 'What is the primary role of the CPU scheduler in an operating system?',
+        options: [
+          'To allocate physical memory to process threads.',
+          'To select which process in the ready queue is allocated CPU time next.',
+          'To manage secondary storage operations.',
+          'To initialize bios boot sequences.'
+        ],
+        correct_option_index: 1,
+        explanation: 'The CPU scheduler selects from among the processes in memory that are ready to execute and allocates the CPU to one of them.'
+      },
+      {
+        question_text: 'Which data structure follows a First-In-First-Out (FIFO) pattern?',
+        options: ['Stack', 'Queue', 'Heap', 'Hash Table'],
+        correct_option_index: 1,
+        explanation: 'A queue is a linear structure that follows the FIFO principle where elements are inserted at the back and removed from the front.'
+      }
+    ];
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are an expert academic evaluator.
+      Your task is to generate 5 high-quality multiple choice questions (MCQs) based strictly on the provided reference material.
+      Adhere to the requested academic difficulty: '${difficulty}'.
+
+      Reference Material:
+      """
+      ${contextText}
+      """
+
+      Return a response in JSON format matching this schema:
+      [
+        {
+          "question_text": "A clear, challenging question.",
+          "options": ["Option A", "Option B", "Option C", "Option D"],
+          "correct_option_index": 0,
+          "explanation": "Provide a detailed explanation of why the correct option is right."
+        }
+      ]
+      Do not return any other text than the JSON block.
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const cleanJsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJsonText) as QuizQuestion[];
+    return parsed;
+  } catch (err) {
+    console.error('Error generating quiz from Gemini:', err);
+    throw err;
+  }
+};
+
+export interface GeneratedFlashcard {
+  question: string;
+  answer: string;
+  topic: string;
+}
+
+export const generateFlashcardsFromText = async (
+  contextText: string
+): Promise<GeneratedFlashcard[]> => {
+  if (!genAI) {
+    return [
+      {
+        question: 'Explain Virtual Memory',
+        answer: 'Virtual memory is a storage allocation scheme in which secondary memory can be addressed as though it were part of main memory.',
+        topic: 'Operating Systems'
+      },
+      {
+        question: 'What is a Red-Black Tree?',
+        answer: 'A Red-Black Tree is a self-balancing binary search tree where each node has a color attribute (red or black) to ensure logarithmic height.',
+        topic: 'Data Structures'
+      }
+    ];
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `
+      You are a premium academic tutor.
+      Your task is to generate 5 high-quality flashcards for active recall study based strictly on the provided reference material.
+
+      Reference Material:
+      """
+      ${contextText}
+      """
+
+      Return a response in JSON format matching this schema:
+      [
+        {
+          "question": "A concise active recall question.",
+          "answer": "A clear, detailed explanation or answer.",
+          "topic": "The specific topic or concept heading."
+        }
+      ]
+      Do not return any other text than the JSON block.
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const cleanJsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJsonText) as GeneratedFlashcard[];
+    return parsed;
+  } catch (err) {
+    console.error('Error generating flashcards from Gemini:', err);
+    throw err;
+  }
+};
+

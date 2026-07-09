@@ -69,31 +69,31 @@ export const Dashboard: React.FC = () => {
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <div className="h-8 w-48 bg-slate-200 rounded animate-pulse"></div>
-            <div className="h-4 w-72 bg-slate-200 rounded animate-pulse"></div>
+            <div className="h-8 w-48 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+            <div className="h-4 w-72 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
           </div>
         </div>
         
         {/* Stats Grid Skeleton */}
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-              <div className="h-10 w-10 bg-slate-100 rounded-lg animate-pulse"></div>
-              <div className="h-6 w-12 bg-slate-200 rounded animate-pulse"></div>
-              <div className="h-3 w-20 bg-slate-200 rounded animate-pulse"></div>
+            <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3 animate-pulse">
+              <div className="h-10 w-10 bg-slate-100 dark:bg-slate-800 rounded-lg"></div>
+              <div className="h-6 w-12 bg-slate-200 dark:bg-slate-800 rounded"></div>
+              <div className="h-3 w-20 bg-slate-200 dark:bg-slate-800 rounded"></div>
             </div>
           ))}
         </div>
 
         {/* Charts Skeleton */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 h-80 animate-pulse">
-            <div className="h-6 w-32 bg-slate-200 rounded mb-4"></div>
-            <div className="h-full w-full bg-slate-100 rounded"></div>
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 h-80 animate-pulse flex flex-col justify-between">
+            <div className="h-6 w-32 bg-slate-200 dark:bg-slate-800 rounded mb-4"></div>
+            <div className="h-full w-full bg-slate-100 dark:bg-slate-800/40 rounded"></div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 h-80 animate-pulse">
-            <div className="h-6 w-32 bg-slate-200 rounded mb-4"></div>
-            <div className="h-full w-full bg-slate-100 rounded"></div>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 h-80 animate-pulse flex flex-col justify-between">
+            <div className="h-6 w-32 bg-slate-200 dark:bg-slate-800 rounded mb-4"></div>
+            <div className="h-full w-full bg-slate-100 dark:bg-slate-800/40 rounded"></div>
           </div>
         </div>
       </div>
@@ -135,13 +135,13 @@ export const Dashboard: React.FC = () => {
           return (
             <div
               key={stat.name}
-              className="bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-md hover:border-slate-300 transition duration-200 group"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition duration-200 group"
             >
-              <div className={`p-2.5 rounded-xl inline-block border ${stat.color} group-hover:scale-110 transition duration-200`}>
+              <div className={`p-2.5 rounded-xl inline-block border ${stat.color} dark:bg-opacity-10 group-hover:scale-110 transition duration-200`}>
                 <Icon className="w-5 h-5" />
               </div>
-              <p className="text-2xl font-black text-slate-800 mt-4 tracking-tight">{stat.value}</p>
-              <p className="text-slate-400 text-xs font-semibold mt-1">{stat.name}</p>
+              <p className="text-2xl font-black text-slate-800 dark:text-slate-100 mt-4 tracking-tight">{stat.value}</p>
+              <p className="text-slate-400 dark:text-slate-500 text-xs font-semibold mt-1">{stat.name}</p>
             </div>
           );
         })}
@@ -150,13 +150,13 @@ export const Dashboard: React.FC = () => {
       {/* Main Charts & Activity Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Weekly Activity Area Chart */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="font-bold text-slate-800">Weekly Study Trends</h3>
-              <p className="text-xs text-slate-400">Hours spent utilizing AI and reviewing materials</p>
+              <h3 className="font-bold text-slate-800 dark:text-slate-100">Weekly Study Trends</h3>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Hours spent utilizing AI and reviewing materials</p>
             </div>
-            <span className="text-xs font-semibold text-brand-600 bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1 flex items-center gap-1">
+            <span className="text-xs font-semibold text-brand-600 bg-brand-50 border border-brand-100 dark:bg-brand-500/10 dark:text-brand-400 dark:border-brand-500/20 rounded-lg px-2.5 py-1 flex items-center gap-1">
               <TrendingUp className="w-3.5 h-3.5" /> +14.2% this week
             </span>
           </div>
@@ -169,7 +169,7 @@ export const Dashboard: React.FC = () => {
                     <stop offset="95%" stopColor="#0e8ce2" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" className="dark:opacity-10" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
                 <Tooltip
@@ -182,15 +182,15 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Quiz Performance Bar Chart */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6">
           <div className="mb-6">
-            <h3 className="font-bold text-slate-800">Quiz Scores</h3>
-            <p className="text-xs text-slate-400">Historical performance by day</p>
+            <h3 className="font-bold text-slate-800 dark:text-slate-100">Quiz Scores</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Historical performance by day</p>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" className="dark:opacity-10" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} domain={[0, 100]} />
                 <Tooltip
@@ -206,10 +206,10 @@ export const Dashboard: React.FC = () => {
       {/* Bottom Lists Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Recent Documents */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-slate-800 text-sm md:text-base">Recent Documents</h3>
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm md:text-base">Recent Documents</h3>
               <Link to="/upload" className="text-xs font-semibold text-brand-500 hover:underline flex items-center gap-1">
                 View All <ArrowRight className="w-3.5 h-3.5" />
               </Link>
@@ -218,22 +218,22 @@ export const Dashboard: React.FC = () => {
               {recentDocs.map((doc) => (
                 <div
                   key={doc.id}
-                  className="p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition flex items-center justify-between gap-3 group"
+                  className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition flex items-center justify-between gap-3 group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 bg-blue-50 rounded-lg text-brand-500 flex-shrink-0">
+                    <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg text-brand-500 flex-shrink-0">
                       <FileText className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-slate-800 truncate group-hover:text-brand-600 transition">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-brand-600 transition">
                         {doc.title}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                         {doc.subject} &bull; {doc.size}
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-slate-400 whitespace-nowrap">{doc.date}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">{doc.date}</span>
                 </div>
               ))}
             </div>
@@ -241,10 +241,10 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Recent AI Chats */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-slate-800 text-sm md:text-base">Recent AI Queries</h3>
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm md:text-base">Recent AI Queries</h3>
               <Link to="/ask-ai" className="text-xs font-semibold text-brand-500 hover:underline flex items-center gap-1">
                 New Chat <ArrowRight className="w-3.5 h-3.5" />
               </Link>
@@ -253,15 +253,15 @@ export const Dashboard: React.FC = () => {
               {recentChats.map((chat) => (
                 <div
                   key={chat.id}
-                  className="p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition flex flex-col gap-1.5 group"
+                  className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition flex flex-col gap-1.5 group"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] bg-purple-50 text-purple-600 font-semibold px-2 py-0.5 rounded border border-purple-100 uppercase">
+                    <span className="text-[9px] bg-purple-50 dark:bg-purple-950/20 text-purple-600 font-semibold px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 uppercase">
                       Query
                     </span>
-                    <span className="text-[9px] text-slate-400 truncate">{chat.doc}</span>
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 truncate">{chat.doc}</span>
                   </div>
-                  <p className="text-xs font-medium text-slate-700 truncate group-hover:text-brand-600 transition">
+                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate group-hover:text-brand-600 transition">
                     "{chat.question}"
                   </p>
                 </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { askGemini } from '../../services/gemini';
+import { supabase } from '../../services/supabase';
 import {
   Brain,
   MessageSquare,
@@ -41,20 +42,44 @@ export const AskAI: React.FC = () => {
 
   // Load documents for select box
   useEffect(() => {
-    const stored = localStorage.getItem('studyys_files');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      setDocuments(parsed);
-      if (parsed.length > 0) {
-        setSelectedDocId(parsed[0].id);
+    if (isMock) {
+      const stored = localStorage.getItem('studyys_files');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setDocuments(parsed);
+        if (parsed.length > 0) {
+          setSelectedDocId(parsed[0].id);
+        }
+      } else {
+        const defaultDocs = [
+          { id: 'doc-1', title: 'Operating Systems - Lecture Notes 4.pdf', subject: 'Operating Systems' },
+          { id: 'doc-2', title: 'Data Structures and Algorithms - Midterm Syllabus.pdf', subject: 'Data Structures' },
+        ];
+        setDocuments(defaultDocs);
+        setSelectedDocId('doc-1');
       }
     } else {
-      const defaultDocs = [
-        { id: 'doc-1', title: 'Operating Systems - Lecture Notes 4.pdf', subject: 'Operating Systems' },
-        { id: 'doc-2', title: 'Data Structures and Algorithms - Midterm Syllabus.pdf', subject: 'Data Structures' },
-      ];
-      setDocuments(defaultDocs);
-      setSelectedDocId('doc-1');
+      const fetchSupabaseDocs = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('documents')
+            .select('id, title, subject')
+            .eq('status', 'completed');
+          if (data && data.length > 0) {
+            // Map keys to align with our local structures
+            const docsList = data.map((d: any) => ({
+              id: d.id,
+              title: d.title,
+              subject: d.subject || 'Engineering',
+            }));
+            setDocuments(docsList);
+            setSelectedDocId(docsList[0].id);
+          }
+        } catch (err) {
+          console.error('Error fetching supabase documents:', err);
+        }
+      };
+      fetchSupabaseDocs();
     }
 
     setMessages([
@@ -65,7 +90,7 @@ export const AskAI: React.FC = () => {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
-  }, []);
+  }, [isMock]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,10 +110,39 @@ export const AskAI: React.FC = () => {
     setLoading(true);
 
     try {
+      let contextText = '';
       const selectedDoc = documents.find((d) => d.id === selectedDocId);
-      const contextText = selectedDoc
-        ? `This is mock PDF chunk text extracted from "${selectedDoc.title}" in the subject "${selectedDoc.subject}".`
-        : '';
+      if (selectedDoc) {
+        if (isMock) {
+          const stored = localStorage.getItem('studyys_files');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            const doc = parsed.find((d: any) => d.id === selectedDocId);
+            if (doc && doc.extracted_text) {
+              contextText = doc.extracted_text
+                .map((p: any) => `Page ${p.pageNumber}: ${p.text}`)
+                .join('\n\n');
+            }
+          }
+        } else {
+          // Fetch from database chunks
+          const { data: chunks, error } = await supabase
+            .from('document_chunks')
+            .select('chunk_text, page_number')
+            .eq('document_id', selectedDocId)
+            .order('page_number', { ascending: true });
+          
+          if (chunks && chunks.length > 0) {
+            contextText = chunks
+              .map((c: any) => `Page ${c.page_number}: ${c.chunk_text}`)
+              .join('\n\n');
+          }
+        }
+      }
+
+      if (!contextText && selectedDoc) {
+        contextText = `Reference document: ${selectedDoc.title}. Subject: ${selectedDoc.subject}.`;
+      }
 
       const aiResponse = await askGemini(currentQuery, contextText, difficulty);
 
@@ -147,25 +201,25 @@ export const AskAI: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Workspace Sidebar Setup */}
         <div className="lg:col-span-1 space-y-5">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2 flex items-center gap-1.5">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-805 rounded-2xl p-5 shadow-sm space-y-4">
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-1.5">
               <BookOpen className="w-4 h-4 text-brand-500" /> Study Scope
             </h3>
 
             {/* Select Document */}
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
                 Reference Document
               </label>
               {documents.length === 0 ? (
-                <div className="p-3 bg-slate-50 rounded-xl text-center border border-slate-200">
-                  <p className="text-[10px] text-slate-500">No PDFs uploaded.</p>
+                <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl text-center border border-slate-200 dark:border-slate-800">
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">No PDFs uploaded.</p>
                 </div>
               ) : (
                 <select
                   value={selectedDocId}
                   onChange={(e) => setSelectedDocId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs bg-white"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-705 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                 >
                   {documents.map((doc) => (
                     <option key={doc.id} value={doc.id}>
@@ -178,18 +232,18 @@ export const AskAI: React.FC = () => {
 
             {/* Select Difficulty */}
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
                 Response Depth (Difficulty)
               </label>
-              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+              <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                 {(['easy', 'medium', 'hard'] as const).map((lvl) => (
                   <button
                     key={lvl}
                     onClick={() => setDifficulty(lvl)}
                     className={`text-[10px] py-1.5 rounded-lg capitalize font-bold transition-all ${
                       difficulty === lvl
-                        ? 'bg-white text-brand-600 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
+                        ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                     }`}
                   >
                     {lvl}
@@ -200,14 +254,14 @@ export const AskAI: React.FC = () => {
           </div>
 
           {/* Quick query tags */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="font-bold text-slate-800 text-sm mb-3">Quick Topics</h3>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-3">Quick Topics</h3>
             <div className="flex flex-wrap gap-1.5">
               {['Dijkstra Proof', 'TCP vs UDP', 'Virtual Memory', 'Semaphores', 'SQL Joins'].map((topic) => (
                 <button
                   key={topic}
                   onClick={() => setQuery(`Explain ${topic}`)}
-                  className="text-[10px] bg-slate-50 hover:bg-brand-50 hover:text-brand-600 border border-slate-200 hover:border-brand-200 px-2.5 py-1 rounded-lg text-slate-600 font-semibold transition"
+                  className="text-[10px] bg-slate-50 dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-500/15 hover:text-brand-600 dark:hover:text-brand-400 border border-slate-200 dark:border-slate-700 hover:border-brand-200 dark:hover:border-brand-500/30 px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 font-semibold transition"
                 >
                   {topic}
                 </button>
@@ -217,15 +271,15 @@ export const AskAI: React.FC = () => {
         </div>
 
         {/* Chat Console Viewport */}
-        <div className="lg:col-span-3 flex flex-col h-[550px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="lg:col-span-3 flex flex-col h-[550px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
           {/* Top Panel */}
-          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 bg-brand-500 text-white rounded-lg">
                 <Brain className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-800">Gemini Tutor Workspace</h3>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Gemini Tutor Workspace</h3>
                 <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span> Online
                 </span>
@@ -234,7 +288,7 @@ export const AskAI: React.FC = () => {
           </div>
 
           {/* Messages list */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-4 bg-slate-50/30">
+          <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-4 bg-slate-50/30 dark:bg-slate-950/10">
             {errorMsg && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 max-w-xl mx-auto">
                 <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
@@ -260,22 +314,22 @@ export const AskAI: React.FC = () => {
                   {msg.sender === 'user' ? 'U' : <Sparkles className="w-4 h-4" />}
                 </div>
 
-                {/* Msg text */}
+                 {/* Msg text */}
                 <div className="space-y-1.5">
                   <div
                     className={`rounded-2xl p-4 text-sm shadow-sm ${
                       msg.sender === 'user'
                         ? 'bg-gradient-brand text-white'
-                        : 'bg-white border border-slate-200 text-slate-800'
+                        : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
                     }`}
                   >
                     <p className="whitespace-pre-line leading-relaxed">{msg.text}</p>
 
                     {/* Metadata references */}
                     {msg.sender === 'ai' && (msg.referencedPages || msg.confidence) && (
-                      <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2 text-[10px]">
+                      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap items-center gap-2 text-[10px]">
                         {msg.referencedPages && msg.referencedPages.length > 0 && (
-                          <span className="bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded flex items-center gap-1 border border-slate-200">
+                          <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold px-2 py-0.5 rounded flex items-center gap-1 border border-slate-200 dark:border-slate-600">
                             <FileText className="w-3 h-3 text-slate-400" /> Pages:{' '}
                             {msg.referencedPages.join(', ')}
                           </span>
@@ -289,7 +343,7 @@ export const AskAI: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <span className={`text-[9px] text-slate-400 block ${msg.sender === 'user' ? 'text-right' : ''}`}>
+                  <span className={`text-[9px] text-slate-400 dark:text-slate-500 block ${msg.sender === 'user' ? 'text-right' : ''}`}>
                     {msg.timestamp}
                   </span>
                 </div>
@@ -301,7 +355,7 @@ export const AskAI: React.FC = () => {
                 <div className="w-8 h-8 rounded-full bg-brand-500 text-white flex items-center justify-center border border-brand-600 flex-shrink-0 animate-pulse">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 text-sm shadow-sm flex items-center gap-2 text-slate-500">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-sm shadow-sm flex items-center gap-2 text-slate-500 dark:text-slate-400">
                   <Loader2 className="w-4 h-4 animate-spin text-brand-500" />
                   <span>Gemini is compiling reference nodes...</span>
                 </div>
@@ -310,14 +364,14 @@ export const AskAI: React.FC = () => {
           </div>
 
           {/* Form input bar */}
-          <form onSubmit={handleSend} className="p-4 border-t border-slate-200 bg-white flex gap-3">
+          <form onSubmit={handleSend} className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex gap-3">
             <input
               type="text"
               placeholder="Ask a question about your PDF..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               disabled={loading}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm disabled:bg-slate-50"
+              className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-805 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm disabled:bg-slate-50 dark:disabled:bg-slate-850"
             />
             <button
               type="submit"

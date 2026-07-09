@@ -73,18 +73,18 @@ export const Reports: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-brand-500" />
             <span>Academic Analytics & Reports</span>
           </h2>
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
             Evaluate your course preparation levels, core strengths, and learning patterns.
           </p>
         </div>
 
         <button
           onClick={exportCSV}
-          className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-95"
+          className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-95"
         >
           <Download className="w-4.5 h-4.5" />
           <span>Export CSV Report</span>
@@ -93,33 +93,33 @@ export const Reports: React.FC = () => {
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-brand-500 rounded-xl border border-blue-100">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/20 text-brand-500 rounded-xl border border-blue-100 dark:border-blue-900/50">
             <Clock className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="text-2xl font-black text-slate-800 tracking-tight">21.5 hrs</h4>
-            <p className="text-xs text-slate-400 font-bold uppercase mt-0.5">Total Study Time</p>
+            <h4 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">21.5 hrs</h4>
+            <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase mt-0.5">Total Study Time</p>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-purple-50 text-purple-500 rounded-xl border border-purple-100">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-purple-50 dark:bg-purple-950/20 text-purple-500 rounded-xl border border-purple-100 dark:border-purple-900/50">
             <Award className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="text-2xl font-black text-slate-800 tracking-tight">84.5%</h4>
-            <p className="text-xs text-slate-400 font-bold uppercase mt-0.5">Average Exam Score</p>
+            <h4 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">84.5%</h4>
+            <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase mt-0.5">Average Exam Score</p>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 text-emerald-500 rounded-xl border border-emerald-100">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 rounded-xl border border-emerald-100 dark:border-emerald-900/50">
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="text-2xl font-black text-slate-800 tracking-tight">4 subjects</h4>
-            <p className="text-xs text-slate-400 font-bold uppercase mt-0.5">Active Courses</p>
+            <h4 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight">4 subjects</h4>
+            <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase mt-0.5">Active Courses</p>
           </div>
         </div>
       </div>
@@ -127,18 +127,18 @@ export const Reports: React.FC = () => {
       {/* Main Charts grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Daily study hours (Bar) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
           <div className="mb-4">
-            <h3 className="font-bold text-slate-800 text-sm">Study Time per Day</h3>
-            <p className="text-[10px] text-slate-400 font-medium">Daily study distribution for current week</p>
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Study Time per Day</h3>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Daily study distribution for current week</p>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyUsageData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" className="dark:opacity-10" />
                 <XAxis dataKey="day" stroke="#94a3b8" fontSize={11} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '11px' }} />
+                <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '11px', background: '#fff' }} />
                 <Bar dataKey="hours" name="Study Hours" fill="#0e8ce2" radius={[4, 4, 0, 0]} maxBarSize={30} />
               </BarChart>
             </ResponsiveContainer>
@@ -146,18 +146,18 @@ export const Reports: React.FC = () => {
         </div>
 
         {/* Quiz attempts trend (Line) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
           <div className="mb-4">
-            <h3 className="font-bold text-slate-800 text-sm">Quiz Performance Trend</h3>
-            <p className="text-[10px] text-slate-400 font-medium">Progress curves across consecutive test takes</p>
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Quiz Performance Trend</h3>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Progress curves across consecutive test takes</p>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={quizTrendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" className="dark:opacity-10" />
                 <XAxis dataKey="attempt" stroke="#94a3b8" fontSize={11} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} domain={[0, 100]} />
-                <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '11px' }} />
+                <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '11px', background: '#fff' }} />
                 <Line type="monotone" dataKey="score" name="Score %" stroke="#8b5cf6" strokeWidth={2.5} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -165,10 +165,10 @@ export const Reports: React.FC = () => {
         </div>
 
         {/* Subject distribution (Pie) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm lg:col-span-2">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm lg:col-span-2">
           <div className="mb-4">
-            <h3 className="font-bold text-slate-800 text-sm">Study Time by Subject</h3>
-            <p className="text-[10px] text-slate-400 font-medium">Proportional allocation of minutes spent</p>
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Study Time by Subject</h3>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Proportional allocation of minutes spent</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
             <div className="h-64">
@@ -194,12 +194,12 @@ export const Reports: React.FC = () => {
             
             <div className="space-y-4">
               {subjectData.map((subj) => (
-                <div key={subj.name} className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div key={subj.name} className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                   <div className="flex items-center gap-2">
                     <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: subj.color }}></span>
-                    <span className="text-xs font-semibold text-slate-700">{subj.name}</span>
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{subj.name}</span>
                   </div>
-                  <span className="text-xs font-extrabold text-slate-800">{subj.value}%</span>
+                  <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">{subj.value}%</span>
                 </div>
               ))}
             </div>
