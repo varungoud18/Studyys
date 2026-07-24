@@ -68,6 +68,8 @@ export const Quiz: React.FC = () => {
   const { isMock, profile } = useAuth();
   const [documents, setDocuments] = useState<any[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
+  const [sourceType, setSourceType] = useState<'pdf' | 'topic'>('pdf');
+  const [customTopic, setCustomTopic] = useState('');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [quizState, setQuizState] = useState<'config' | 'loading' | 'active' | 'result'>('config');
@@ -85,7 +87,11 @@ export const Quiz: React.FC = () => {
         setDocuments(parsed);
         if (parsed.length > 0) {
           setSelectedDocId(parsed[0].id);
+        } else {
+          setSourceType('topic');
         }
+      } else {
+        setSourceType('topic');
       }
     } else {
       const fetchSupabaseDocs = async () => {
@@ -100,12 +106,16 @@ export const Quiz: React.FC = () => {
               id: d.id,
               title: d.title,
               subject: d.subjects?.name || 'Engineering',
+              subject_id: d.subject_id,
             }));
             setDocuments(docsList);
             setSelectedDocId(docsList[0].id);
+          } else {
+            setSourceType('topic');
           }
         } catch (err) {
           console.error('Error fetching supabase documents:', err);
+          setSourceType('topic');
         }
       };
       fetchSupabaseDocs();
@@ -118,42 +128,95 @@ export const Quiz: React.FC = () => {
 
     try {
       let contextText = '';
-      const selectedDoc = documents.find((d) => d.id === selectedDocId);
-      if (selectedDoc) {
-        if (isMock) {
-          const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
-          const stored = localStorage.getItem(filesKey);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            const doc = parsed.find((d: any) => d.id === selectedDocId);
-            if (doc && doc.extracted_text) {
-              contextText = doc.extracted_text.map((p: any) => p.text).join('\n\n');
+      if (sourceType === 'pdf') {
+        const selectedDoc = documents.find((d) => d.id === selectedDocId);
+        if (selectedDoc) {
+          if (isMock) {
+            const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+            const stored = localStorage.getItem(filesKey);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              const doc = parsed.find((d: any) => d.id === selectedDocId);
+              if (doc && doc.extracted_text) {
+                contextText = doc.extracted_text.map((p: any) => p.text).join('\n\n');
+              }
+            }
+          } else {
+            const { data: chunks } = await supabase
+              .from('document_chunks')
+              .select('chunk_text')
+              .eq('document_id', selectedDocId);
+            if (chunks) {
+              contextText = chunks.map((c: any) => c.chunk_text).join('\n\n');
             }
           }
-        } else {
-          const { data: chunks } = await supabase
-            .from('document_chunks')
-            .select('chunk_text')
-            .eq('document_id', selectedDocId);
-          if (chunks) {
-            contextText = chunks.map((c: any) => c.chunk_text).join('\n\n');
-          }
         }
+
+        if (!contextText && selectedDoc) {
+          contextText = `Generate quiz about ${selectedDoc.title} in subject ${selectedDoc.subject}`;
+        }
+      } else {
+        contextText = `Custom Topic: ${customTopic || 'General Computer Science'}`;
       }
 
-      if (!contextText) {
-        contextText = selectedDoc ? `Generate quiz about ${selectedDoc.title} in subject ${selectedDoc.subject}` : 'General Engineering, JEE and CBSE';
-      }
-
-      const generated = await generateQuizFromText(contextText, difficulty, 50);
+      const generated = await generateQuizFromText(contextText, difficulty, 15);
       setQuestions(generated);
       setSelectedAnswers({});
       setCurrentIdx(0);
       setQuizState('active');
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Failed to generate quiz from the selected document. Please verify your connection/API key and try again.');
+      setErrorMsg('Failed to generate quiz. Please verify your connection/API key and try again.');
       setQuizState('config');
+    }
+  };
+
+  const loadMoreQuestions = async () => {
+    setErrorMsg(null);
+    setQuizState('loading');
+
+    try {
+      let contextText = '';
+      if (sourceType === 'pdf') {
+        const selectedDoc = documents.find((d) => d.id === selectedDocId);
+        if (selectedDoc) {
+          if (isMock) {
+            const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+            const stored = localStorage.getItem(filesKey);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              const doc = parsed.find((d: any) => d.id === selectedDocId);
+              if (doc && doc.extracted_text) {
+                contextText = doc.extracted_text.map((p: any) => p.text).join('\n\n');
+              }
+            }
+          } else {
+            const { data: chunks } = await supabase
+              .from('document_chunks')
+              .select('chunk_text')
+              .eq('document_id', selectedDocId);
+            if (chunks) {
+              contextText = chunks.map((c: any) => c.chunk_text).join('\n\n');
+            }
+          }
+        }
+
+        if (!contextText && selectedDoc) {
+          contextText = `Generate quiz about ${selectedDoc.title} in subject ${selectedDoc.subject}`;
+        }
+      } else {
+        contextText = `Custom Topic: ${customTopic || 'General Computer Science'}`;
+      }
+
+      const generated = await generateQuizFromText(contextText, difficulty, 15);
+      const updatedQuestions = [...questions, ...generated];
+      setQuestions(updatedQuestions);
+      setCurrentIdx(questions.length); // Start at first new question
+      setQuizState('active');
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Failed to generate additional questions.');
+      setQuizState('result');
     }
   };
 
@@ -306,26 +369,71 @@ export const Quiz: React.FC = () => {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-                Reference Document
+                Quiz Source
               </label>
-              {documents.length === 0 ? (
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-xs text-slate-500 dark:text-slate-400">
-                  No documents available. Please upload a PDF first.
-                </div>
-              ) : (
-                <select
-                  value={selectedDocId}
-                  onChange={(e) => setSelectedDocId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setSourceType('pdf')}
+                  className={`py-2 rounded-xl text-xs font-bold transition ${
+                    sourceType === 'pdf'
+                      ? 'bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-300 dark:border-brand-500/30'
+                      : 'bg-white dark:bg-slate-850 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
+                  }`}
                 >
-                  {documents.map((doc) => (
-                    <option key={doc.id} value={doc.id}>
-                      {doc.title} ({doc.subject})
-                    </option>
-                  ))}
-                </select>
-              )}
+                  Uploaded PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourceType('topic')}
+                  className={`py-2 rounded-xl text-xs font-bold transition ${
+                    sourceType === 'topic'
+                      ? 'bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-300 dark:border-brand-500/30'
+                      : 'bg-white dark:bg-slate-850 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'
+                  }`}
+                >
+                  Custom Topic
+                </button>
+              </div>
             </div>
+
+            {sourceType === 'pdf' ? (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                  Reference Document
+                </label>
+                {documents.length === 0 ? (
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center text-xs text-slate-500 dark:text-slate-400">
+                    No documents available. Please upload a PDF or choose 'Custom Topic'.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedDocId}
+                    onChange={(e) => setSelectedDocId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+                  >
+                    {documents.map((doc) => (
+                      <option key={doc.id} value={doc.id}>
+                        {doc.title} ({doc.subject})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                  Custom Study Topic
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Data Structures, OS Concepts, Computer Networks..."
+                  value={customTopic}
+                  onChange={(e) => setCustomTopic(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
@@ -350,10 +458,10 @@ export const Quiz: React.FC = () => {
 
             <button
               onClick={startQuiz}
-              disabled={documents.length === 0}
+              disabled={sourceType === 'pdf' ? documents.length === 0 : !customTopic.trim()}
               className="w-full bg-gradient-brand text-white font-bold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl active:scale-95 transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
             >
-              <span>Generate Quiz</span>
+              <span>Generate Quiz (15 MCQs)</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -455,13 +563,13 @@ export const Quiz: React.FC = () => {
                 onClick={resetQuiz}
                 className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-705 text-slate-700 dark:text-slate-300 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
               >
-                <RotateCcw className="w-4 h-4" /> Retry Quiz
+                <RotateCcw className="w-4 h-4" /> Reset Settings
               </button>
               <button
-                onClick={startQuiz}
+                onClick={loadMoreQuestions}
                 className="bg-gradient-brand text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm active:scale-95"
               >
-                <Brain className="w-4 h-4" /> Generate 50 More Questions
+                <Brain className="w-4 h-4" /> Generate 15 More Questions
               </button>
             </div>
           </div>

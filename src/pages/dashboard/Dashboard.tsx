@@ -25,6 +25,16 @@ import {
 } from 'recharts';
 import { Link } from 'react-router-dom';
 
+const emptyChartData = [
+  { day: 'Mon', hours: 0, score: 0 },
+  { day: 'Tue', hours: 0, score: 0 },
+  { day: 'Wed', hours: 0, score: 0 },
+  { day: 'Thu', hours: 0, score: 0 },
+  { day: 'Fri', hours: 0, score: 0 },
+  { day: 'Sat', hours: 0, score: 0 },
+  { day: 'Sun', hours: 0, score: 0 },
+];
+
 const chartData = [
   { day: 'Mon', hours: 2.5, score: 75 },
   { day: 'Tue', hours: 3.8, score: 80 },
@@ -48,7 +58,7 @@ export const Dashboard: React.FC = () => {
   
   const [recentDocs, setRecentDocs] = useState<any[]>([]);
   const [recentChats, setRecentChats] = useState<any[]>([]);
-  const [weeklyData, setWeeklyData] = useState<any[]>(chartData);
+  const [weeklyData, setWeeklyData] = useState<any[]>(emptyChartData);
 
   useEffect(() => {
     if (!profile) return;
@@ -147,7 +157,7 @@ export const Dashboard: React.FC = () => {
           });
 
           const hasData = updatedChartData.some(d => d.hours > 0 || d.score > 0);
-          setWeeklyData(hasData ? updatedChartData : chartData);
+          setWeeklyData(hasData ? updatedChartData : emptyChartData);
         } else {
           // --- Real Supabase Mode ---
           // 1. Files
@@ -256,7 +266,7 @@ export const Dashboard: React.FC = () => {
           });
 
           const hasData = updatedChartData.some(d => d.hours > 0 || d.score > 0);
-          setWeeklyData(hasData ? updatedChartData : chartData);
+          setWeeklyData(hasData ? updatedChartData : emptyChartData);
         }
       } catch (err) {
         console.error('Error fetching dashboard stats:', err);

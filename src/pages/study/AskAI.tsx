@@ -28,12 +28,13 @@ interface DocumentOption {
   id: string;
   title: string;
   subject: string;
+  subject_id?: string;
 }
 
 export const AskAI: React.FC = () => {
   const { isMock, profile } = useAuth();
   const [documents, setDocuments] = useState<DocumentOption[]>([]);
-  const [selectedDocId, setSelectedDocId] = useState<string>('');
+  const [selectedDocId, setSelectedDocId] = useState<string>('general-knowledge');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -45,20 +46,19 @@ export const AskAI: React.FC = () => {
     if (isMock) {
       const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
       const stored = localStorage.getItem(filesKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setDocuments(parsed);
-        if (parsed.length > 0) {
-          setSelectedDocId(parsed[0].id);
-        }
-      } else {
-        const defaultDocs = [
+      let parsed = stored ? JSON.parse(stored) : [];
+      if (parsed.length === 0) {
+        parsed = [
           { id: 'doc-1', title: 'Operating Systems - Lecture Notes 4.pdf', subject: 'Operating Systems' },
           { id: 'doc-2', title: 'Data Structures and Algorithms - Midterm Syllabus.pdf', subject: 'Data Structures' },
         ];
-        setDocuments(defaultDocs);
-        setSelectedDocId('doc-1');
       }
+      const list = [
+        { id: 'general-knowledge', title: 'General Knowledge (No PDF)', subject: 'General' },
+        ...parsed
+      ];
+      setDocuments(list);
+      setSelectedDocId('general-knowledge');
     } else {
       const fetchSupabaseDocs = async () => {
         try {
@@ -67,18 +67,22 @@ export const AskAI: React.FC = () => {
             .select('id, title, subject_id, subjects (name)')
             .eq('status', 'completed');
           if (error) throw error;
-          if (data && data.length > 0) {
-            // Map keys to align with our local structures
-            const docsList = data.map((d: any) => ({
-              id: d.id,
-              title: d.title,
-              subject: d.subjects?.name || 'Engineering',
-            }));
-            setDocuments(docsList);
-            setSelectedDocId(docsList[0].id);
-          }
+          const docsList = (data || []).map((d: any) => ({
+            id: d.id,
+            title: d.title,
+            subject: d.subjects?.name || 'Engineering',
+            subject_id: d.subject_id,
+          }));
+          const list = [
+            { id: 'general-knowledge', title: 'General Knowledge (No PDF)', subject: 'General' },
+            ...docsList
+          ];
+          setDocuments(list);
+          setSelectedDocId('general-knowledge');
         } catch (err) {
           console.error('Error fetching supabase documents:', err);
+          setDocuments([{ id: 'general-knowledge', title: 'General Knowledge (No PDF)', subject: 'General' }]);
+          setSelectedDocId('general-knowledge');
         }
       };
       fetchSupabaseDocs();
@@ -88,11 +92,11 @@ export const AskAI: React.FC = () => {
       {
         id: 'welcome',
         sender: 'ai',
-        text: `Hello! I am your engineering co-pilot. Select one of your uploaded PDF materials, choose your difficulty, and ask me anything about the textbook content.`,
+        text: `Hello! I am your engineering co-pilot. Select one of your uploaded PDF materials, or choose 'General Knowledge (No PDF)' to ask me anything directly.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
-  }, [isMock]);
+  }, [isMock, profile]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +118,7 @@ export const AskAI: React.FC = () => {
     try {
       let contextText = '';
       const selectedDoc = documents.find((d) => d.id === selectedDocId);
-      if (selectedDoc) {
+      if (selectedDoc && selectedDocId !== 'general-knowledge') {
         if (isMock) {
           const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
           const stored = localStorage.getItem(filesKey);
@@ -143,7 +147,7 @@ export const AskAI: React.FC = () => {
         }
       }
 
-      if (!contextText && selectedDoc) {
+      if (!contextText && selectedDoc && selectedDocId !== 'general-knowledge') {
         contextText = `Reference document: ${selectedDoc.title}. Subject: ${selectedDoc.subject}.`;
       }
 
@@ -200,7 +204,7 @@ export const AskAI: React.FC = () => {
             try {
               await supabase.from('questions').insert({
                 user_id: profile.id,
-                document_id: selectedDocId || null,
+                document_id: selectedDocId === 'general-knowledge' ? null : (selectedDocId || null),
                 query: currentQuery,
                 answer: aiResponse.answer,
                 referenced_pages: aiResponse.referencedPages || null,
@@ -211,7 +215,7 @@ export const AskAI: React.FC = () => {
               // Add to study sessions
               await supabase.from('study_sessions').insert({
                 user_id: profile.id,
-                subject_id: selectedDoc?.subject_id || null,
+                subject_id: selectedDocId === 'general-knowledge' ? null : (selectedDoc?.subject_id || null),
                 duration_minutes: 2,
                 activity_type: 'chat',
               });

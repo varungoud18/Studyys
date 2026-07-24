@@ -54,6 +54,8 @@ export const Flashcards: React.FC = () => {
   const { isMock, profile } = useAuth();
   const [documents, setDocuments] = useState<any[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>('');
+  const [sourceType, setSourceType] = useState<'pdf' | 'topic'>('pdf');
+  const [customTopic, setCustomTopic] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -71,7 +73,11 @@ export const Flashcards: React.FC = () => {
         setDocuments(parsed);
         if (parsed.length > 0) {
           setSelectedDocId(parsed[0].id);
+        } else {
+          setSourceType('topic');
         }
+      } else {
+        setSourceType('topic');
       }
     } else {
       const fetchSupabaseDocs = async () => {
@@ -89,9 +95,12 @@ export const Flashcards: React.FC = () => {
             }));
             setDocuments(docsList);
             setSelectedDocId(docsList[0].id);
+          } else {
+            setSourceType('topic');
           }
         } catch (err) {
           console.error('Error fetching supabase documents:', err);
+          setSourceType('topic');
         }
       };
       fetchSupabaseDocs();
@@ -100,7 +109,7 @@ export const Flashcards: React.FC = () => {
 
   // Dynamically load topics when document is selected
   useEffect(() => {
-    if (!selectedDocId) return;
+    if (!selectedDocId || sourceType !== 'pdf') return;
 
     const loadTopics = async () => {
       try {
@@ -136,7 +145,7 @@ export const Flashcards: React.FC = () => {
     };
 
     loadTopics();
-  }, [selectedDocId, documents, isMock, profile]);
+  }, [selectedDocId, documents, isMock, profile, sourceType]);
 
   useEffect(() => {
     if (!profile) return;
@@ -294,34 +303,39 @@ export const Flashcards: React.FC = () => {
     setLoading(true);
     try {
       let contextText = '';
-      const selectedDoc = documents.find((d) => d.id === selectedDocId);
-      if (selectedDoc) {
-        if (isMock) {
-          const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
-          const stored = localStorage.getItem(filesKey);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            const doc = parsed.find((d: any) => d.id === selectedDocId);
-            if (doc && doc.extracted_text) {
-              contextText = doc.extracted_text.map((p: any) => p.text).join('\n\n');
+      const topicToGenerate = sourceType === 'pdf' ? selectedTopic : customTopic;
+      
+      if (sourceType === 'pdf') {
+        const selectedDoc = documents.find((d) => d.id === selectedDocId);
+        if (selectedDoc) {
+          if (isMock) {
+            const filesKey = profile ? `studyys_${profile.id}_files` : 'studyys_files';
+            const stored = localStorage.getItem(filesKey);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              const doc = parsed.find((d: any) => d.id === selectedDocId);
+              if (doc && doc.extracted_text) {
+                contextText = doc.extracted_text.map((p: any) => p.text).join('\n\n');
+              }
+            }
+          } else {
+            const { data: chunks } = await supabase
+              .from('document_chunks')
+              .select('chunk_text')
+              .eq('document_id', selectedDocId);
+            if (chunks) {
+              contextText = chunks.map((c: any) => c.chunk_text).join('\n\n');
             }
           }
-        } else {
-          const { data: chunks } = await supabase
-            .from('document_chunks')
-            .select('chunk_text')
-            .eq('document_id', selectedDocId);
-          if (chunks) {
-            contextText = chunks.map((c: any) => c.chunk_text).join('\n\n');
-          }
         }
+        if (!contextText && selectedDoc) {
+          contextText = `Generate flashcards for ${selectedDoc.title} in subject ${selectedDoc.subject}`;
+        }
+      } else {
+        contextText = `Custom Topic: ${customTopic || 'General Computer Science'}`;
       }
 
-      if (!contextText) {
-        contextText = selectedDoc ? `Generate flashcards for ${selectedDoc.title} in subject ${selectedDoc.subject}` : 'General Computer Science, Math, and Physics';
-      }
-
-      const generated = await generateFlashcardsFromText(contextText, selectedTopic, 50);
+      const generated = await generateFlashcardsFromText(contextText, topicToGenerate, 15);
       const mappedCards: Flashcard[] = generated.map((gc, index) => ({
         id: `fc-gen-${Date.now()}-${index}`,
         topic: gc.topic,
@@ -351,7 +365,7 @@ export const Flashcards: React.FC = () => {
         if (profile) {
           const inserts = mappedCards.map(c => ({
             user_id: profile.id,
-            document_id: selectedDocId || null,
+            document_id: sourceType === 'pdf' ? (selectedDocId || null) : null,
             question: c.question,
             answer: c.answer,
             topic: c.topic,
@@ -389,7 +403,7 @@ export const Flashcards: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('Failed to generate flashcards from the selected document.');
+      setErrorMsg('Failed to generate flashcards.');
     } finally {
       setLoading(false);
     }
@@ -408,57 +422,98 @@ export const Flashcards: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Document Dropdown */}
-          <div className="w-full sm:w-60">
-            <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-              Select Source Document
-            </label>
-            {documents.length === 0 ? (
-              <div className="p-3 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl text-center text-xs text-slate-500 dark:text-slate-400">
-                No documents. Upload a PDF first.
-              </div>
-            ) : (
-              <select
-                value={selectedDocId}
-                onChange={(e) => setSelectedDocId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
-              >
-                {documents.map((doc) => (
-                  <option key={doc.id} value={doc.id}>
-                    {doc.title} ({doc.subject})
-                  </option>
-                ))}
-              </select>
-            )}
+        <div className="flex flex-col xl:flex-row xl:items-center gap-4 w-full xl:w-auto">
+          {/* Source Type Toggle */}
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button
+              onClick={() => setSourceType('pdf')}
+              className={`text-[10px] px-3 py-1.5 rounded-lg font-bold transition-all ${
+                sourceType === 'pdf'
+                  ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Source PDF
+            </button>
+            <button
+              onClick={() => setSourceType('topic')}
+              className={`text-[10px] px-3 py-1.5 rounded-lg font-bold transition-all ${
+                sourceType === 'topic'
+                  ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Custom Topic
+            </button>
           </div>
 
-          {/* Topic Dropdown */}
-          <div className="w-full sm:w-60">
-            <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-              Select Study Topic
-            </label>
-            <select
-              value={selectedTopic}
-              onChange={(e) => setSelectedTopic(e.target.value)}
-              disabled={topics.length === 0}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 disabled:opacity-50"
-            >
-              {topics.map((top, idx) => (
-                <option key={idx} value={top}>
-                  {top}
-                </option>
-              ))}
-            </select>
-          </div>
+          {sourceType === 'pdf' ? (
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              {/* Document Dropdown */}
+              <div className="w-full sm:w-52">
+                <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                  Select Source Document
+                </label>
+                {documents.length === 0 ? (
+                  <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 rounded-xl text-center text-[10px] text-slate-500 dark:text-slate-400">
+                    No documents. Upload a PDF first.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedDocId}
+                    onChange={(e) => setSelectedDocId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+                  >
+                    {documents.map((doc) => (
+                      <option key={doc.id} value={doc.id}>
+                        {doc.title} ({doc.subject})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Topic Dropdown */}
+              <div className="w-full sm:w-52">
+                <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                  Select Study Topic
+                </label>
+                <select
+                  value={selectedTopic}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  disabled={topics.length === 0}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 disabled:opacity-50"
+                >
+                  {topics.map((top, idx) => (
+                    <option key={idx} value={top}>
+                      {top}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="w-full sm:w-80">
+              <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                Custom Study Topic
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Virtual Memory, Stack vs Heap..."
+                value={customTopic}
+                onChange={(e) => setCustomTopic(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs bg-white dark:bg-slate-850 dark:border-slate-700 dark:text-slate-200"
+              />
+            </div>
+          )}
 
           <button
             onClick={() => generateNewDeck(false)}
-            disabled={loading || documents.length === 0}
-            className="bg-gradient-brand text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-[0.98] disabled:opacity-50 mt-4 sm:mt-5"
+            disabled={loading || (sourceType === 'pdf' ? (documents.length === 0 || topics.length === 0) : !customTopic.trim())}
+            className="bg-gradient-brand text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-[0.98] disabled:opacity-50 mt-1 xl:mt-4"
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
-            {loading ? 'Recompiling...' : 'Generate Cards'}
+            {loading ? 'Recompiling...' : 'Generate 15 Cards'}
           </button>
         </div>
       </div>
@@ -482,7 +537,7 @@ export const Flashcards: React.FC = () => {
           <Layers className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
           <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No Flashcards Yet</p>
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 max-w-xs mx-auto">
-            Select a document & topic from the header and click "Generate Cards" to build a deck.
+            Select a document & topic from the header or enter a Custom Topic, and click "Generate 15 Cards" to build a deck.
           </p>
         </div>
       ) : (
@@ -586,14 +641,14 @@ export const Flashcards: React.FC = () => {
             </button>
           </div>
 
-          {/* Generate 50 more cards button */}
+          {/* Generate 15 more cards button */}
           <button
             onClick={() => generateNewDeck(true)}
             disabled={loading}
             className="w-full bg-gradient-brand text-white font-bold py-3 rounded-xl text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
-            Generate 50 More Cards for "{selectedTopic}"
+            Generate 15 More Cards for "{sourceType === 'pdf' ? selectedTopic : customTopic}"
           </button>
         </div>
       )}

@@ -169,13 +169,13 @@ export const History: React.FC = () => {
   const getIconColor = (type: string) => {
     switch (type) {
       case 'AI Chat':
-        return 'text-emerald-500 bg-emerald-50 border-emerald-100';
+        return 'text-emerald-500 bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900/50';
       case 'Quiz Attempt':
-        return 'text-purple-500 bg-purple-50 border-purple-100';
+        return 'text-purple-500 bg-purple-50 border-purple-100 dark:bg-purple-950/20 dark:border-purple-900/50';
       case 'Flashcard Review':
-        return 'text-amber-500 bg-amber-50 border-amber-100';
+        return 'text-amber-500 bg-amber-50 border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/50';
       default:
-        return 'text-blue-500 bg-blue-50 border-blue-100';
+        return 'text-blue-500 bg-blue-50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-900/50';
     }
   };
 
@@ -210,18 +210,18 @@ export const History: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
             <HistoryIcon className="w-7 h-7 text-brand-500" />
             <span>Study History</span>
           </h2>
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
             Review your academic logs, quiz attempts, and AI conversations.
           </p>
         </div>
 
         <button
           onClick={handleExport}
-          className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-95"
+          className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-sm transition active:scale-95 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-805 dark:text-slate-200"
         >
           <Download className="w-4.5 h-4.5" />
           <span>Export Logs</span>
@@ -229,16 +229,16 @@ export const History: React.FC = () => {
       </div>
 
       {/* Filters panel */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 dark:bg-slate-900 dark:border-slate-800">
         {/* Search */}
         <div className="relative md:col-span-2">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
             placeholder="Search by keywords..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:focus:ring-brand-500/30"
           />
         </div>
 
@@ -247,7 +247,7 @@ export const History: React.FC = () => {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           >
             <option value="All">All Formats</option>
             <option value="AI Chat">AI Chats</option>
@@ -261,7 +261,7 @@ export const History: React.FC = () => {
           <select
             value={subjectFilter}
             onChange={(e) => setSubjectFilter(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           >
             {subjectsList.map((sub) => (
               <option key={sub} value={sub}>
@@ -273,36 +273,36 @@ export const History: React.FC = () => {
       </div>
 
       {/* Logs Table list */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden dark:bg-slate-900 dark:border-slate-800">
         {filteredHistory.length === 0 ? (
           <div className="py-16 text-center">
-            <HistoryIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm font-bold text-slate-500">No activities found</p>
-            <p className="text-xs text-slate-400 mt-1">Try modifying your filter parameters.</p>
+            <HistoryIcon className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No activities found</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Try modifying your filter parameters.</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {filteredHistory.map((item) => {
               const Icon = getIcon(item.type);
               return (
-                <div key={item.id} className="p-5 flex items-start gap-4 hover:bg-slate-50/50 transition">
+                <div key={item.id} className="p-5 flex items-start gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition">
                   <div className={`p-2 rounded-xl border ${getIconColor(item.type)} flex-shrink-0`}>
                     <Icon className="w-5 h-5" />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded border border-slate-200">
+                      <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
                         {item.subject}
                       </span>
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
                         <Calendar className="w-3 h-3" /> {item.date}
                       </span>
                     </div>
-                    <p className="text-sm font-bold text-slate-800 mt-1 leading-normal">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-1 leading-normal">
                       {item.title}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">{item.detail}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{item.detail}</p>
                   </div>
                 </div>
               );

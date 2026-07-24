@@ -191,11 +191,11 @@ export const SharedLibrary: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
             <FolderHeart className="w-7 h-7 text-brand-500" />
             <span>Shared Library</span>
           </h2>
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
             Access, download, and review crowd-sourced, peer-reviewed engineering course resources.
           </p>
         </div>
@@ -209,15 +209,15 @@ export const SharedLibrary: React.FC = () => {
       </div>
 
       {/* Filters & Search */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 dark:bg-slate-900 dark:border-slate-800">
         <div className="relative md:col-span-2">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
             placeholder="Search notes, tags, or subjects..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-205 dark:focus:ring-brand-500/30"
           />
         </div>
 
@@ -225,7 +225,7 @@ export const SharedLibrary: React.FC = () => {
           <select
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none"
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           >
             <option value="All">All Branches</option>
             <option value="Computer Science">Computer Science</option>
@@ -238,7 +238,7 @@ export const SharedLibrary: React.FC = () => {
           <select
             value={semFilter}
             onChange={(e) => setSemFilter(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none"
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           >
             <option value="All">All Semesters</option>
             {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
@@ -255,8 +255,8 @@ export const SharedLibrary: React.FC = () => {
         {filteredNotes.map((note) => (
           <div
             key={note.id}
-            className={`bg-white border rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-slate-300 transition relative overflow-hidden ${
-              note.status === 'pending' ? 'border-amber-200 bg-amber-50/20' : 'border-slate-200'
+            className={`bg-white border rounded-2xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition relative overflow-hidden ${
+              note.status === 'pending' ? 'border-amber-200 bg-amber-50/20 dark:border-amber-900/50 dark:bg-amber-950/10' : 'border-slate-200 dark:border-slate-800 dark:bg-slate-900'
             }`}
           >
             {note.status === 'pending' && (
@@ -267,16 +267,16 @@ export const SharedLibrary: React.FC = () => {
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wider">
+                <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wider dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
                   Sem {note.semester} &bull; {note.branch}
                 </span>
-                <span className="text-[9px] text-slate-400">{note.created_at}</span>
+                <span className="text-[9px] text-slate-400 dark:text-slate-505">{note.created_at}</span>
               </div>
 
-              <h3 className="font-extrabold text-slate-800 text-sm md:text-base leading-snug hover:text-brand-600 transition">
+              <h3 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm md:text-base leading-snug hover:text-brand-600 dark:hover:text-brand-400 transition">
                 {note.title}
               </h3>
-              <p className="text-slate-500 text-xs mt-2 line-clamp-3 leading-relaxed">
+              <p className="text-slate-500 dark:text-slate-400 text-xs mt-2 line-clamp-3 leading-relaxed">
                 {note.description}
               </p>
 
@@ -284,7 +284,7 @@ export const SharedLibrary: React.FC = () => {
                 {note.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="text-[9px] bg-blue-50 text-brand-600 px-2 py-0.5 rounded-full border border-blue-100"
+                    className="text-[9px] bg-blue-50 text-brand-600 px-2 py-0.5 rounded-full border border-blue-100 dark:bg-blue-950/20 dark:text-brand-400 dark:border-blue-900/50"
                   >
                     #{tag}
                   </span>
@@ -292,9 +292,9 @@ export const SharedLibrary: React.FC = () => {
               </div>
             </div>
 
-            <div className="border-t border-slate-100 mt-6 pt-4 flex items-center justify-between">
-              <span className="text-[10px] text-slate-400 font-semibold">
-                Uploaded by: <span className="text-slate-600 font-bold">{note.user_name}</span>
+            <div className="border-t border-slate-100 dark:border-slate-800 mt-6 pt-4 flex items-center justify-between">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
+                Uploaded by: <span className="text-slate-600 dark:text-slate-300 font-bold">{note.user_name}</span>
               </span>
 
               {/* Action Buttons */}
@@ -303,14 +303,14 @@ export const SharedLibrary: React.FC = () => {
                   <div className="flex gap-1">
                     <button
                       onClick={() => setNoteStatus(note.id, 'approved')}
-                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-200"
+                      className="p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded border border-emerald-200 dark:border-emerald-900/50"
                       title="Approve note"
                     >
                       <Check className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setNoteStatus(note.id, 'rejected')}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded border border-red-200"
+                      className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded border border-red-200 dark:border-red-900/50"
                       title="Reject note"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -320,13 +320,13 @@ export const SharedLibrary: React.FC = () => {
                   <>
                     <button
                       onClick={() => handleUpvote(note.id)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-[10px] text-slate-600 hover:bg-slate-50 hover:text-slate-800 font-bold transition"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[10px] text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 font-bold transition"
                     >
-                      <ThumbsUp className="w-3 h-3 text-slate-400" /> {note.upvotes}
+                      <ThumbsUp className="w-3 h-3 text-slate-400 dark:text-slate-500" /> {note.upvotes}
                     </button>
                     <button
                       onClick={() => handleDownloadMock(note.id, note.title)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 text-[10px] text-white hover:bg-slate-800 font-bold transition"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 text-[10px] text-white hover:bg-slate-800 font-bold transition dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100"
                     >
                       <Download className="w-3 h-3" /> {note.downloads}
                     </button>
@@ -341,72 +341,72 @@ export const SharedLibrary: React.FC = () => {
       {/* Publish Modal */}
       {publishModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setPublishModal(false)} />
+          <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm" onClick={() => setPublishModal(false)} />
           
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 max-w-lg w-full relative z-10 animate-fade-in space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="text-base font-black text-slate-800">Publish to Shared Library</h3>
-              <button className="text-slate-400 hover:text-slate-600" onClick={() => setPublishModal(false)}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-w-lg w-full relative z-10 animate-fade-in space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+              <h3 className="text-base font-black text-slate-800 dark:text-slate-105">Publish to Shared Library</h3>
+              <button className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300" onClick={() => setPublishModal(false)}>
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handlePublish} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-500 uppercase tracking-wider mb-1.5">Document Title</label>
+                <label className="block font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Document Title</label>
                 <input
                   type="text"
                   placeholder="e.g. Semaphores Practice Problems"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
                   required
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
+                <label className="block font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Description</label>
                 <textarea
                   placeholder="Summarize the core topics covered in these notes..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none h-20"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none h-20 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase tracking-wider mb-1.5">Subject</label>
+                  <label className="block font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Subject</label>
                   <input
                     type="text"
                     placeholder="e.g. Operating Systems"
                     value={newSub}
                     onChange={(e) => setNewSub(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tags (Comma-separated)</label>
+                  <label className="block font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Tags (Comma-separated)</label>
                   <input
                     type="text"
                     placeholder="e.g. mutex, semaphores"
                     value={newTags}
                     onChange={(e) => setNewTags(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase tracking-wider mb-1.5">Branch</label>
+                  <label className="block font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Branch</label>
                   <select
                     value={newBranch}
                     onChange={(e) => setNewBranch(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
                   >
                     <option value="Computer Science">Computer Science</option>
                     <option value="Electronics & Communication">Electronics</option>
@@ -415,11 +415,11 @@ export const SharedLibrary: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase tracking-wider mb-1.5">Semester</label>
+                  <label className="block font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Semester</label>
                   <select
                     value={newSem}
                     onChange={(e) => setNewSem(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-205"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
                       <option key={sem} value={sem}>
@@ -443,3 +443,4 @@ export const SharedLibrary: React.FC = () => {
     </div>
   );
 };
+
