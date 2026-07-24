@@ -206,7 +206,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
               rel="noopener noreferrer"
               className="text-brand-500 hover:underline font-bold"
             >
-              Karupothula Varun Goud
+              Varun Goud Karupothula
             </a>
           </div>
         </div>
