@@ -230,7 +230,7 @@ export const AskAI: React.FC = () => {
 
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('An error occurred while connecting with Gemini. Please try again.');
+      setErrorMsg(err?.message || 'An error occurred while connecting with Gemini. Please try again.');
     } finally {
       setLoading(false);
     }

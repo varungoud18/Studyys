@@ -55,9 +55,9 @@ export const askGemini = async (
     const cleanJsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleanJsonText) as AskAiResponse;
     return parsed;
-  } catch (err) {
-    console.error('Error calling Gemini API, falling back to simulator:', err);
-    return simulateResponse(query, difficulty);
+  } catch (err: any) {
+    console.error('Error calling Gemini API:', err);
+    throw new Error(err?.message || 'Gemini API call failed.');
   }
 };
 
