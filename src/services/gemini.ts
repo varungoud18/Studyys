@@ -60,6 +60,45 @@ export const resolveBestModel = (): Promise<string> => {
   return resolvedModelPromise;
 };
 
+export const cleanAndParseJSON = (text: string): any => {
+  const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  try {
+    return JSON.parse(clean);
+  } catch (err) {
+    console.warn("Failed standard JSON parse, attempting control character sanitization...", err);
+    let sanitized = clean;
+    let inString = false;
+    let escapedText = "";
+    for (let i = 0; i < sanitized.length; i++) {
+      const char = sanitized[i];
+      const prevChar = i > 0 ? sanitized[i - 1] : '';
+      if (char === '"' && prevChar !== '\\') {
+        inString = !inString;
+        escapedText += char;
+      } else if (inString) {
+        if (char === '\n') {
+          escapedText += '\\n';
+        } else if (char === '\r') {
+          escapedText += '\\r';
+        } else if (char === '\t') {
+          escapedText += '\\t';
+        } else {
+          escapedText += char;
+        }
+      } else {
+        escapedText += char;
+      }
+    }
+
+    try {
+      return JSON.parse(escapedText);
+    } catch (secondErr) {
+      console.error("Sanitized JSON parse also failed:", secondErr);
+      throw err;
+    }
+  }
+};
+
 export interface AskAiResponse {
   answer: string;
   referencedPages: number[];
@@ -104,8 +143,7 @@ export const askGemini = async (
     const result = await model.generateContent(systemPrompt);
     const text = result.response.text();
     
-    const cleanJsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanJsonText) as AskAiResponse;
+    const parsed = cleanAndParseJSON(text) as AskAiResponse;
     return parsed;
   } catch (err: any) {
     console.error('Error calling Gemini API:', err);
@@ -581,8 +619,7 @@ export const generateQuizFromText = async (
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const cleanJsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-      questions = JSON.parse(cleanJsonText) as QuizQuestion[];
+      questions = cleanAndParseJSON(text) as QuizQuestion[];
     } catch (err) {
       console.warn('Gemini quiz generation failed, using local builder:', err);
     }
@@ -746,8 +783,7 @@ export const generateFlashcardsFromText = async (
 
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const cleanJsonText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-      cards = JSON.parse(cleanJsonText) as GeneratedFlashcard[];
+      cards = cleanAndParseJSON(text) as GeneratedFlashcard[];
     } catch (err) {
       console.warn('Gemini flashcard generation failed, using local builder:', err);
     }
