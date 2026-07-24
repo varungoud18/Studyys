@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { askGemini } from '../../services/gemini';
+import { askGemini, hasApiKey } from '../../services/gemini';
 import { supabase } from '../../services/supabase';
 import {
   Brain,
@@ -344,6 +344,16 @@ export const AskAI: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Warning Banner for missing/invalid API Key */}
+          {!hasApiKey && (
+            <div className="px-6 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/40 flex items-center gap-2 text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+              <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <span>
+                Running in <strong>Simulated Fallback Mode</strong>. Configure a valid Gemini API key starting with <code>AIzaSy</code> in your <code>.env</code> file to get real-time AI answers.
+              </span>
+            </div>
+          )}
 
           {/* Messages list */}
           <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-4 bg-slate-50/30 dark:bg-slate-950/10">

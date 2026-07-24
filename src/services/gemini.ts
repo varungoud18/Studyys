@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-const hasApiKey = apiKey && !apiKey.includes('Placeholder') && apiKey.length > 10;
+export const hasApiKey = !!(apiKey && !apiKey.includes('Placeholder') && apiKey.length > 10 && (apiKey.startsWith('AIzaSy') || apiKey.startsWith('AQ.')));
 
 // Initialize Gemini if key is provided
 let genAI: GoogleGenerativeAI | null = null;
