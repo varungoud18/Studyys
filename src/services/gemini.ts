@@ -9,6 +9,57 @@ if (hasApiKey) {
   genAI = new GoogleGenerativeAI(apiKey);
 }
 
+let resolvedModelPromise: Promise<string> | null = null;
+
+export const resolveBestModel = (): Promise<string> => {
+  if (resolvedModelPromise) return resolvedModelPromise;
+
+  resolvedModelPromise = (async () => {
+    let activeModelName = 'gemini-1.5-flash';
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      const data = await res.json();
+      if (data && Array.isArray(data.models)) {
+        const names = data.models.map((m: any) => m.name.replace('models/', ''));
+        console.log('Available Gemini Models:', names);
+
+        const preferred = [
+          'gemini-1.5-flash',
+          'gemini-1.5-flash-latest',
+          'gemini-1.5-pro',
+          'gemini-1.5-pro-latest',
+          'gemini-2.5-flash',
+          'gemini-3.6-flash',
+          'gemini-3.5-flash-lite',
+          'gemini-pro'
+        ];
+
+        for (const modelId of preferred) {
+          if (names.includes(modelId)) {
+            activeModelName = modelId;
+            console.log(`Resolved active Gemini model to: ${activeModelName}`);
+            return activeModelName;
+          }
+        }
+
+        const fallback = data.models.find((m: any) =>
+          m.supportedGenerationMethods?.includes('generateContent') &&
+          (m.name.includes('flash') || m.name.includes('pro') || m.name.includes('gemini'))
+        );
+        if (fallback) {
+          activeModelName = fallback.name.replace('models/', '');
+          console.log(`Fallback resolved active Gemini model to: ${activeModelName}`);
+        }
+      }
+    } catch (err) {
+      console.error('Error resolving Gemini model, using default:', err);
+    }
+    return activeModelName;
+  })();
+
+  return resolvedModelPromise;
+};
+
 export interface AskAiResponse {
   answer: string;
   referencedPages: number[];
@@ -25,7 +76,8 @@ export const askGemini = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const modelName = await resolveBestModel();
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     const systemPrompt = `
       You are an elite Engineering Professor and Academic Tutor. 
@@ -502,7 +554,8 @@ export const generateQuizFromText = async (
   // Try to generate via Gemini first if available
   if (genAI) {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const modelName = await resolveBestModel();
+      const model = genAI.getGenerativeModel({ model: modelName });
       // Request 15 questions per call to stay safe from output limits, and run in loop/fallback
       const prompt = `
         You are an expert academic evaluator.
@@ -668,7 +721,8 @@ export const generateFlashcardsFromText = async (
   // Try to generate via Gemini first if available
   if (genAI) {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const modelName = await resolveBestModel();
+      const model = genAI.getGenerativeModel({ model: modelName });
       const prompt = `
         You are a premium academic tutor.
         Your task is to generate 15 high-quality flashcards for active recall study based strictly on the provided reference material.
