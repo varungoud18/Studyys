@@ -25,7 +25,7 @@ export const askGemini = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const systemPrompt = `
       You are an elite Engineering Professor and Academic Tutor. 
@@ -502,7 +502,7 @@ export const generateQuizFromText = async (
   // Try to generate via Gemini first if available
   if (genAI) {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       // Request 15 questions per call to stay safe from output limits, and run in loop/fallback
       const prompt = `
         You are an expert academic evaluator.
@@ -668,7 +668,7 @@ export const generateFlashcardsFromText = async (
   // Try to generate via Gemini first if available
   if (genAI) {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const prompt = `
         You are a premium academic tutor.
         Your task is to generate 15 high-quality flashcards for active recall study based strictly on the provided reference material.
