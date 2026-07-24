@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Bookmark,
 } from 'lucide-react';
+import { MarkdownRenderer } from '../../components/MarkdownRenderer';
 
 interface ChatMessage {
   id: string;
@@ -380,7 +381,12 @@ export const AskAI: React.FC = () => {
                         : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'
                     }`}
                   >
-                    <p className="whitespace-pre-line leading-relaxed">{msg.text}</p>
+                    {msg.sender === 'user' ? (
+                      <p className="whitespace-pre-line leading-relaxed">{msg.text}</p>
+                    ) : (
+                      <MarkdownRenderer text={msg.text} />
+                    )}
+
 
                     {/* Metadata references */}
                     {msg.sender === 'ai' && (msg.referencedPages || msg.confidence) && (
